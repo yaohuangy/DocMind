@@ -459,14 +459,12 @@ pytest tests/ -v
 ## 🌱 后续优化方向
 
 ### 🚧 企业部署能力
-- 🚧 **Docker 容器化**：编写 Dockerfile + `docker-compose.yml`（含 ChromaDB + Neo4j 依赖），支持 `docker-compose up` 一键启动全栈服务。
+- ✅ **Docker 容器化**：编写 Dockerfile + `docker-compose.yml`（含 ChromaDB + Neo4j 依赖），支持 `docker-compose up` 一键启动全栈服务。
 - 🚧 **CI/CD 自动化**：GitHub Actions 自动跑代码质量检查（Ruff/mypy）和小型集成测试，保障合并质量。
-- 💡 *简历亮点：项目容器化部署，支持 docker-compose 一键启动全栈服务。*
 
 ### 🚧 检索质量进阶——结构化文档处理
 - 🚧 **PDF 表格抽取**：使用 PyMuPDF 的表格识别能力，将表格转为 Markdown 格式再分块，大幅提升财务报表、技术规格文档的问答准确率。
 - 🚧 **多模态分块补充**：PPT 中的图片使用 OCR 提取文字，或至少将图表标题抽取为文本补充，减少图表信息丢失。
-- 💡 *简历亮点：针对表格密集型文档实现结构化抽取与 Markdown 归一化，表格查询 Recall 提升 XX%。*
 
 ### 🚧 检索结果压缩与去冗
 - 🚧 **召回片段去重压缩**：RAG 召回的多片段可能存在重复或冗余信息，送入 LLM 前做一次语义去重 + 关键句压缩，减少 token 消耗，提升生成质量。
