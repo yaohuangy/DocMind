@@ -18,6 +18,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: docmind-app
+    env_file:
+      - .env
     ports:
       - "${APP_PORT:-7860}:7860"
     volumes:

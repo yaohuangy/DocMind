@@ -4,6 +4,8 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 
 相比只输出一段文本的 LLM Demo，这个项目更强调完整链路落地：从**多格式文档解析、多维检索策略、答案生成与引用定位，到三记忆学习系统、在线反馈监控与多用户数据隔离**，尽量把 RAG 能力组织成一个可交互、可持久化、可评估的产品原型。
 
+🌐 **在线体验**：https://docmind-production-ed1a.up.railway.app
+
 ---
 
 ## 📸 效果展示
@@ -121,7 +123,7 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 ### 系统特性
 | 特性 | 说明 |
 |------|------|
-| 🆓 免费模型 | 默认阿里 DashScope（qwen-turbo），注册即送免费额度 |
+| 🆓 免费模型 | 默认阿里 DashScope（qwen-max），注册即送免费额度 |
 | 🎛️ 灵活配置 | 可视化设置页——LLM/Embedding/检索参数，改完即时生效 |
 | 🛡️ 优雅降级 | Neo4j 不可用 → 语义记忆自动禁用，问答笔记不影响 |
 | 🐍 纯 Python | 0 行 HTML/CSS/JS，Streamlit 原生组件 |
@@ -409,7 +411,7 @@ pytest tests/ -v
 |------|------|--------|
 | `LLM_API_KEY` | LLM API 密钥（**必填**） | - |
 | `LLM_BASE_URL` | API 基础地址 | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| `LLM_MODEL` | 模型名称 | `qwen-turbo`（免费） |
+| `LLM_MODEL` | 模型名称 | `qwen-max`（免费额度） |
 | `EMBEDDING_BACKEND` | `api` 或 `local` | `api` |
 | `EMBEDDING_MODEL` | 嵌入模型 | `text-embedding-v4` |
 | `EMBEDDING_BATCH_SIZE` | 嵌入批大小（DashScope 上限 10） | `10` |
@@ -424,7 +426,7 @@ pytest tests/ -v
 
 | 平台 | LLM 模型 | 嵌入模型 | 费用 |
 |------|---------|---------|------|
-| **阿里 DashScope** | `qwen-turbo` | `text-embedding-v4` | 有免费额度 |
+| **阿里 DashScope** | `qwen-max` | `text-embedding-v4` | 有免费额度 |
 | **硅基流动** | `Qwen/Qwen2.5-7B-Instruct` | `BAAI/bge-large-zh-v1.5` | 有免费额度 |
 | **DeepSeek** | `deepseek-chat` | - | 低价 |
 | **智谱 AI** | `glm-4-flash` | `embedding-2` | 有免费额度 |
@@ -459,14 +461,13 @@ pytest tests/ -v
 ## 🌱 后续优化方向
 
 ### 🚧 企业部署能力
-- 🚧 **Docker 容器化**：编写 Dockerfile + `docker-compose.yml`（含 ChromaDB + Neo4j 依赖），支持 `docker-compose up` 一键启动全栈服务。
+- ✅ **Docker 容器化**：编写 Dockerfile + `docker-compose.yml`（含 ChromaDB + Neo4j 依赖），支持 `docker-compose up` 一键启动全栈服务。
+- ✅ **Railway 云端部署**：项目已部署上线，支持公网访问、持久化存储、Neo4j AuraDB 知识图谱。
 - 🚧 **CI/CD 自动化**：GitHub Actions 自动跑代码质量检查（Ruff/mypy）和小型集成测试，保障合并质量。
-- 💡 *简历亮点：项目容器化部署，支持 docker-compose 一键启动全栈服务。*
 
 ### 🚧 检索质量进阶——结构化文档处理
 - 🚧 **PDF 表格抽取**：使用 PyMuPDF 的表格识别能力，将表格转为 Markdown 格式再分块，大幅提升财务报表、技术规格文档的问答准确率。
 - 🚧 **多模态分块补充**：PPT 中的图片使用 OCR 提取文字，或至少将图表标题抽取为文本补充，减少图表信息丢失。
-- 💡 *简历亮点：针对表格密集型文档实现结构化抽取与 Markdown 归一化，表格查询 Recall 提升 XX%。*
 
 ### 🚧 检索结果压缩与去冗
 - 🚧 **召回片段去重压缩**：RAG 召回的多片段可能存在重复或冗余信息，送入 LLM 前做一次语义去重 + 关键句压缩，减少 token 消耗，提升生成质量。
