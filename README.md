@@ -88,7 +88,6 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 | ✏️ 编辑/删除 | 单条编辑问题和回答、批量多选删除（二次确认）、一键清空全部 |
 | 🗺️ 知识图谱 | 概念总数、高频概念 Top10 |
 | 📊 学习报告 | JSON 报告 + LLM 学习建议 + 下载 |
-| 🔄 重建记忆 | 从聊天记录批量补录到记忆系统 |
 
 ### 笔记管理
 | 功能 | 说明 |
@@ -239,6 +238,62 @@ streamlit run app.py --server.address 0.0.0.0 --server.port 7860
 6. 在 **🧠 回顾** 页浏览历史、搜索记忆、生成学习报告
 7. 在 **📊 监控** 页查看满意率和延迟对比
 8. 在 **⚙️ 设置** 页调整参数
+
+---
+
+## 🐳 Docker 部署
+
+不想手动配置 Python 环境？一键启动：
+
+```bash
+# 全栈启动（Streamlit + Neo4j 知识图谱）
+docker-compose up -d
+
+# 或仅启动应用（不需要 Neo4j）
+docker-compose up -d docmind
+```
+
+浏览器打开 **http://localhost:7860**
+
+### 首次部署步骤
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/<your-username>/docmind.git
+cd docmind
+
+# 2. 配置环境变量（至少填入 LLM_API_KEY）
+cp .env.example .env
+# 编辑 .env，填入你的 API Key
+
+# 3. 一键启动
+docker-compose up -d
+```
+
+### 纯 Docker 运行（不用 docker-compose）
+
+```bash
+docker build -t docmind .
+docker run -p 7860:7860 --env-file .env -v ./data:/app/data docmind
+```
+
+> 📦 **数据持久化**：ChromaDB 向量库、SQLite 提问记录、上传的文档都保存在 `./data` 目录，通过 Docker volume 挂载，容器删除后数据不丢失。
+
+> 💡 **优雅降级**：Neo4j 服务不可用时，知识图谱功能自动禁用，问答、笔记等核心功能完全不受影响。如果你不需要知识图谱，可以在 `docker-compose.yml` 中注释掉 `neo4j` 服务块。
+
+---
+
+## ☁️ Railway 云端部署
+
+项目已部署到 Railway，可直接访问体验，**无需配置任何 API Key**。
+
+### 为什么选 Railway？
+
+- ✅ **原生 Docker 支持**：自动识别 `Dockerfile`，零额外配置
+- ✅ **持久化存储**：Volume 挂载 `/app/data`，ChromaDB + SQLite 数据重启不丢
+- ✅ **自动 HTTPS**：获得 `*.up.railway.app` 域名
+
+> 💡 部署时只需在 Railway Variables 中配置好 API Key，访问者打开链接即可直接使用，无需任何配置。
 
 ---
 

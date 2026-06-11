@@ -1,0 +1,102 @@
+# ============================================================================
+# DocMind — Docker Compose 多服务编排
+# ============================================================================
+# 使用方式:
+#   全栈启动（含 Neo4j）: docker-compose up -d
+#   仅 Streamlit 应用:   docker-compose up -d docmind
+#   停止所有服务:         docker-compose down
+#   停止并删除数据卷:     docker-compose down -v
+# ============================================================================
+
+
+services:
+  # -------------------------------------------------------------------------
+  # DocMind Streamlit 应用
+  # -------------------------------------------------------------------------
+  docmind:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docmind-app
+    ports:
+      - "${APP_PORT:-7860}:7860"
+    volumes:
+      # 持久化运行时数据（ChromaDB 向量库 + SQLite + 上传文件）
+      - ./data:/app/data
+      # 开发模式：取消下面注释，改代码后只需 docker-compose restart（无需 rebuild）
+      # - ./src:/app/src
+      # - ./pages:/app/pages
+      # - ./app.py:/app/app.py
+      # - ./run.py:/app/run.py
+    environment:
+      # LLM 配置
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      - LLM_MODEL=${LLM_MODEL:-qwen-turbo}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.0}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-2048}
+      - LLM_STREAM_TIMEOUT=${LLM_STREAM_TIMEOUT:-60}
+      # Embedding 配置
+      - EMBEDDING_BACKEND=${EMBEDDING_BACKEND:-api}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-v4}
+      - EMBEDDING_LOCAL_MODEL=${EMBEDDING_LOCAL_MODEL:-BAAI/bge-small-zh-v1.5}
+      - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-10}
+      # ChromaDB
+      - CHROMA_PERSIST_PATH=${CHROMA_PERSIST_PATH:-./data/chroma}
+      # Neo4j
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-password}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+      # SQLite
+      - SQLITE_PATH=${SQLITE_PATH:-./data/metadata.db}
+      # 检索参数
+      - RETRIEVAL_TOP_K=${RETRIEVAL_TOP_K:-10}
+      - MQE_NUM_VARIANTS=${MQE_NUM_VARIANTS:-4}
+      - HYDE_WEIGHT=${HYDE_WEIGHT:-0.6}
+      - RRF_K=${RRF_K:-60}
+      # 分块参数
+      - CHUNK_SIZE=${CHUNK_SIZE:-1024}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-128}
+      # 应用
+      - APP_NAME=${APP_NAME:-DocMind}
+      - APP_PORT=${APP_PORT:-7860}
+      - DEBUG=${DEBUG:-false}
+    restart: unless-stopped
+    depends_on:
+      neo4j:
+        condition: service_started
+
+  # -------------------------------------------------------------------------
+  # Neo4j 图数据库（可选）
+  # -------------------------------------------------------------------------
+  # 如果不需要知识图谱功能，可以注释掉整个 neo4j 服务块。
+  # 应用会在 Neo4j 不可用时自动禁用语义记忆，问答和笔记功能不受影响。
+  #
+  # 常见问题：端口冲突
+  #   如果启动时报错 "port is already allocated"，说明本机已有 Neo4j 占用
+  #   7474/7687 端口（例如之前用 docker run 启动过）。解决方法：
+  #     docker ps                    # 找到占用端口的容器名
+  #     docker stop <容器名>          # 停止旧容器
+  #     docker rm <容器名>            # 删除旧容器
+  #     然后重新 docker-compose up -d
+  # -------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:latest
+    container_name: docmind-neo4j
+    ports:
+      - "7474:7474"   # Neo4j Browser
+      - "7687:7687"   # Bolt 协议
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}
+      - NEO4J_dbms_memory_heap_initial__size=256m
+      - NEO4J_dbms_memory_heap_max__size=512m
+      - NEO4J_dbms_memory_pagecache_size=128m
+    volumes:
+      - ./neo4j-data:/data
+      - ./neo4j-logs:/logs
+    restart: unless-stopped
+
+volumes: {}

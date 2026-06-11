@@ -68,30 +68,8 @@ with tab_history:
         st.caption(f"共 {len(all_records)} 条记录")
 
         # 记忆管理
-        with st.expander("🔧 记忆管理（清空 / 重建）"):
-            col_rebuild, col_clear_ep, col_clear_neo = st.columns(3)
-
-            with col_rebuild:
-                if st.button("🔄 从当前会话重建", help="把当前聊天记录逐条补录到情景记忆和语义记忆", key="rebuild_memory"):
-                    msgs = st.session_state.get("messages", [])
-                    rebuilt = 0
-                    for j in range(0, len(msgs) - 1, 2):
-                        if msgs[j]["role"] == "user" and msgs[j + 1]["role"] == "assistant":
-                            q = msgs[j]["content"]
-                            a = msgs[j + 1]["content"]
-                            s = msgs[j + 1].get("sources", [])
-                            try:
-                                from src.engine.models import SourceChunk
-                                sources_list = [SourceChunk.from_dict(si) for si in s] if s else []
-                                engine.record_interaction(question=q, answer=a, sources=sources_list)
-                                rebuilt += 1
-                            except Exception as exc:
-                                st.warning(f"重建第 {j // 2 + 1} 条失败: {exc}")
-                    if rebuilt > 0:
-                        st.success(f"已重建 {rebuilt} 条记录！")
-                        st.rerun()
-                    else:
-                        st.info("当前聊天记录为空。")
+        with st.expander("🔧 记忆管理（清空）"):
+            col_clear_ep, col_clear_neo = st.columns(2)
 
             with col_clear_ep:
                 if st.button("🗑️ 清空情景记忆", help="删除当前用户所有 Q&A 记录（ChromaDB）", key="clear_episodic"):
