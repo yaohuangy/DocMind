@@ -464,8 +464,6 @@ pytest tests/ -v
 - ✅ **Docker 容器化**：编写 Dockerfile + `docker-compose.yml`（含 ChromaDB + Neo4j 依赖），支持 `docker-compose up` 一键启动全栈服务。
 <<<<<<< HEAD
 - ✅ **Railway 云端部署**：项目已部署上线，支持公网访问、持久化存储、Neo4j AuraDB 知识图谱。
-=======
->>>>>>> 08837a30ec30eda3839cedc449128df1417c65d4
 - 🚧 **CI/CD 自动化**：GitHub Actions 自动跑代码质量检查（Ruff/mypy）和小型集成测试，保障合并质量。
 
 ### 🚧 检索质量进阶——结构化文档处理
