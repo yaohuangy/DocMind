@@ -13,7 +13,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.graph_store import GraphStore
 from src.memory.models import ConceptNode, Relation
@@ -37,7 +37,7 @@ class SemanticMemory:
         results = sm.search_concepts("attention")
     """
 
-    def __init__(self, graph_store: Optional[GraphStore] = None) -> None:
+    def __init__(self, graph_store: GraphStore | None = None) -> None:
         """
         Args:
             graph_store: 图数据库封装。None 则自动创建。
@@ -134,9 +134,9 @@ class SemanticMemory:
 
     def add_concepts_batch(
         self,
-        concepts: List[Dict[str, str]],
+        concepts: list[dict[str, str]],
         user_id: str = "default",
-    ) -> List[ConceptNode]:
+    ) -> list[ConceptNode]:
         """批量添加概念。
 
         Args:
@@ -146,7 +146,7 @@ class SemanticMemory:
         Returns:
             ConceptNode 列表。
         """
-        results: List[ConceptNode] = []
+        results: list[ConceptNode] = []
         for c in concepts:
             try:
                 node = self.add_concept(
@@ -160,7 +160,7 @@ class SemanticMemory:
                 logger.warning("概念 '%s' 添加失败: %s", c.get("name"), e)
         return results
 
-    def get_concept(self, name: str, user_id: str = "") -> Optional[ConceptNode]:
+    def get_concept(self, name: str, user_id: str = "") -> ConceptNode | None:
         """按名称查询概念。
 
         Args:
@@ -179,7 +179,7 @@ class SemanticMemory:
 
     def search_concepts(
         self, keyword: str, limit: int = 20, user_id: str = "",
-    ) -> List[ConceptNode]:
+    ) -> list[ConceptNode]:
         """按关键词搜索概念。
 
         Args:
@@ -195,7 +195,7 @@ class SemanticMemory:
         results = self._graph.search_concepts(keyword, limit=limit, user_id=user_id)
         return [ConceptNode.from_dict(r) for r in results]
 
-    def get_all_concepts(self, limit: int = 100, user_id: str = "") -> List[ConceptNode]:
+    def get_all_concepts(self, limit: int = 100, user_id: str = "") -> list[ConceptNode]:
         """获取所有概念节点。
 
         Args:
@@ -285,7 +285,7 @@ class SemanticMemory:
 
     def get_neighbourhood(
         self, concept_name: str, depth: int = 1
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取概念的邻域子图。
 
         Args:
@@ -319,7 +319,7 @@ class SemanticMemory:
         print(f"[NEO4J] get_concept_count: user_id='{user_id}', count={count}")
         return count
 
-    def get_graph_summary(self) -> Dict[str, Any]:
+    def get_graph_summary(self) -> dict[str, Any]:
         """获取知识图谱摘要。
 
         Returns:

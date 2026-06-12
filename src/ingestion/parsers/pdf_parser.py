@@ -6,11 +6,10 @@ PDF 文档解析器。
 """
 
 import logging
-from typing import List
 
 from llama_index.core.schema import Document as LlamaDocument
 
-from src.ingestion.parsers.base_parser import BaseParser, make_doc_id
+from src.ingestion.parsers.base_parser import BaseParser
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class PDFParser(BaseParser):
     def supported_format(self) -> str:
         return "pdf"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 PDF 文件，每页生成一个 LlamaDocument。
 
         Args:
@@ -43,7 +42,7 @@ class PDFParser(BaseParser):
 
         doc_id = self._make_doc_id(source)
         doc_name = self._source_name(source)
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
 
         try:
             pdf = fitz.open(source)
@@ -90,7 +89,7 @@ class PDFParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def parse_via_llamaindex(source: str) -> List[LlamaDocument]:
+    def parse_via_llamaindex(source: str) -> list[LlamaDocument]:
         """使用 LlamaIndex PDFReader 作为备选解析方案。
 
         Args:

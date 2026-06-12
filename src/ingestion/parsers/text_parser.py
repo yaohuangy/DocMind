@@ -7,7 +7,6 @@
 
 import logging
 from pathlib import Path
-from typing import List
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -29,7 +28,7 @@ class TextParser(BaseParser):
     def supported_format(self) -> str:
         return "txt"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 TXT 文件。
 
         Args:
@@ -69,7 +68,7 @@ class TextParser(BaseParser):
         lines = text.split("\n")
         paragraphs = self._group_paragraphs(lines)
 
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
 
         for para_text, line_start, line_end in paragraphs:
             if not para_text.strip():
@@ -121,8 +120,8 @@ class TextParser(BaseParser):
 
     @staticmethod
     def _group_paragraphs(
-        lines: List[str], max_para_lines: int = 50
-    ) -> List[tuple]:
+        lines: list[str], max_para_lines: int = 50
+    ) -> list[tuple]:
         """将行列表按空行分组为段落。
 
         超长段落会被拆分为多个子段落。
@@ -134,8 +133,8 @@ class TextParser(BaseParser):
         Returns:
             (text, line_start, line_end) 元组列表，均为 1-based。
         """
-        paragraphs: List[tuple] = []
-        current: List[str] = []
+        paragraphs: list[tuple] = []
+        current: list[str] = []
         current_start = 1  # 1-based
 
         for idx, line in enumerate(lines, start=1):

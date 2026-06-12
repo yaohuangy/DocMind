@@ -6,7 +6,6 @@
 """
 
 import logging
-from typing import List, Optional
 
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import Document as LlamaDocument
@@ -31,7 +30,7 @@ class TextChunker:
             print(chunk.text, chunk.metadata["chunk_index"])
     """
 
-    def __init__(self, config: Optional[ChunkConfig] = None):
+    def __init__(self, config: ChunkConfig | None = None):
         """
         Args:
             config: 分块配置。为 None 时自动从全局配置加载。
@@ -49,7 +48,7 @@ class TextChunker:
         )
 
     @staticmethod
-    def _default_tokenizer(text: str) -> List[str]:
+    def _default_tokenizer(text: str) -> list[str]:
         """默认 tokenizer——按空白字符分词，作为 token 计数的近似。
 
         SentenceSplitter 通过 tokenizer 的返回长度估算 token 数。
@@ -61,7 +60,7 @@ class TextChunker:
     # 分块入口
     # ------------------------------------------------------------------
 
-    def split(self, documents: List[LlamaDocument]) -> List[LlamaDocument]:
+    def split(self, documents: list[LlamaDocument]) -> list[LlamaDocument]:
         """对一个或多个 LlamaDocument 进行分块。
 
         每个文档独立分块，metadata 继承自源文档并追加：
@@ -75,7 +74,7 @@ class TextChunker:
         Returns:
             分块后的 LlamaDocument 列表（平铺，顺序保持）。
         """
-        all_chunks: List[LlamaDocument] = []
+        all_chunks: list[LlamaDocument] = []
 
         for doc in documents:
             doc_chunks = self._split_one(doc)
@@ -90,7 +89,7 @@ class TextChunker:
         )
         return all_chunks
 
-    def _split_one(self, document: LlamaDocument) -> List[LlamaDocument]:
+    def _split_one(self, document: LlamaDocument) -> list[LlamaDocument]:
         """对单个文档执行分块。
 
         Args:
@@ -104,11 +103,11 @@ class TextChunker:
             return []
 
         # LlamaIndex SentenceSplitter 的 get_nodes_from_documents 方法
-        nodes: List[TextNode] = self._splitter.get_nodes_from_documents(
+        nodes: list[TextNode] = self._splitter.get_nodes_from_documents(
             [document]
         )
 
-        chunks: List[LlamaDocument] = []
+        chunks: list[LlamaDocument] = []
         total = len(nodes)
 
         for idx, node in enumerate(nodes):
@@ -132,8 +131,8 @@ class TextChunker:
     def split_text(
         self,
         text: str,
-        metadata: Optional[dict] = None,
-    ) -> List[LlamaDocument]:
+        metadata: dict | None = None,
+    ) -> list[LlamaDocument]:
         """对单段文本进行分块（便捷方法）。
 
         Args:

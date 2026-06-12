@@ -10,13 +10,11 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
 from src.core.config import Settings, get_config
 from src.core.embedder import create_embedder
 from src.core.llm_client import LLMClient
-from src.core.vector_store import SearchResult, VectorStore
-from src.engine.models import SourceChunk
+from src.core.vector_store import VectorStore
 from src.engine.qa_engine import QAEngine
 from src.evaluation.instrumentation import (
     InstrumentedEmbedder,
@@ -36,7 +34,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_METHODS = ["direct", "mqe", "hyde", "mqe+hyde"]
 
 # 方法显示名称
-_METHOD_DISPLAY: Dict[str, str] = {
+_METHOD_DISPLAY: dict[str, str] = {
     "direct": "直接检索",
     "mqe": "MQE",
     "hyde": "HyDE",
@@ -56,7 +54,7 @@ class EvaluationRunner:
         runner.print_table(report)
     """
 
-    def __init__(self, config: Optional[Settings] = None) -> None:
+    def __init__(self, config: Settings | None = None) -> None:
         """
         Args:
             config: 全局配置。None 则自动加载。
@@ -77,7 +75,7 @@ class EvaluationRunner:
     def run(
         self,
         dataset_path: str,
-        methods: Optional[List[str]] = None,
+        methods: list[str] | None = None,
         top_k: int = 10,
     ) -> EvalReport:
         """执行完整评测。
@@ -106,8 +104,8 @@ class EvaluationRunner:
             len(questions), len(methods), top_k,
         )
 
-        all_per_question: List[PerQuestionResult] = []
-        method_metrics_list: List[MethodMetrics] = []
+        all_per_question: list[PerQuestionResult] = []
+        method_metrics_list: list[MethodMetrics] = []
 
         for method in methods:
             logger.info("--- 评测方法: %s ---", method)
@@ -124,7 +122,7 @@ class EvaluationRunner:
             # 重建检索器缓存（使用新的计时组件）
             engine._retrievers = {}
 
-            method_results: List[PerQuestionResult] = []
+            method_results: list[PerQuestionResult] = []
 
             for i, eq in enumerate(questions):
                 pq = self._eval_one(
@@ -234,8 +232,8 @@ class EvaluationRunner:
     def _aggregate_with_dataset(
         self,
         method: str,
-        results: List[PerQuestionResult],
-        questions: List[EvalQuestion],
+        results: list[PerQuestionResult],
+        questions: list[EvalQuestion],
     ) -> MethodMetrics:
         """使用数据集中的 GT 信息计算聚合指标。
 
@@ -248,18 +246,18 @@ class EvaluationRunner:
             MethodMetrics。
         """
         # 构建 question_text → GT IDs 映射
-        gt_map: Dict[str, Set[str]] = {}
+        gt_map: dict[str, set[str]] = {}
         for eq in questions:
             gt_map[eq.question] = set(eq.relevant_chunk_ids)
 
-        recall5_vals: List[float] = []
-        recall10_vals: List[float] = []
-        prec5_vals: List[float] = []
-        prec10_vals: List[float] = []
-        mrr_vals: List[float] = []
-        ndcg5_vals: List[float] = []
-        ndcg10_vals: List[float] = []
-        latencies: List[float] = []
+        recall5_vals: list[float] = []
+        recall10_vals: list[float] = []
+        prec5_vals: list[float] = []
+        prec10_vals: list[float] = []
+        mrr_vals: list[float] = []
+        ndcg5_vals: list[float] = []
+        ndcg10_vals: list[float] = []
+        latencies: list[float] = []
 
         for r in results:
             gt_ids = gt_map.get(r.question, set())
@@ -324,8 +322,6 @@ class EvaluationRunner:
 
         for m in methods:
             display = _METHOD_DISPLAY.get(m.method, m.method)
-            lat_ratio = f"{m.avg_latency_sec / min_lat:.1f}x" if min_lat > 0 else "-"
-
             row = (
                 f"{display:<14} "
                 f"{m.recall_at_5:>6.1%} "
@@ -405,7 +401,7 @@ class EvaluationRunner:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _load_dataset(dataset_path: str) -> List[EvalQuestion]:
+    def _load_dataset(dataset_path: str) -> list[EvalQuestion]:
         """从 JSON 加载评测数据集。
 
         Args:
@@ -418,10 +414,10 @@ class EvaluationRunner:
         if not path.exists():
             raise FileNotFoundError(f"数据集文件不存在: {dataset_path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
-        questions: List[EvalQuestion] = []
+        questions: list[EvalQuestion] = []
         for item in data.get("questions", []):
             questions.append(EvalQuestion(
                 question=item["question"],

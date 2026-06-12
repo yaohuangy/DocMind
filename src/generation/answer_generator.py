@@ -9,7 +9,7 @@
 """
 
 import logging
-from typing import Generator, List, Optional
+from collections.abc import Generator
 
 from src.core.llm_client import LLMClient
 from src.engine.models import SourceChunk
@@ -40,7 +40,7 @@ class AnswerGenerator:
         answer = gen.generate(question, sources)
     """
 
-    def __init__(self, llm_client: Optional[LLMClient] = None) -> None:
+    def __init__(self, llm_client: LLMClient | None = None) -> None:
         """
         Args:
             llm_client: LLM 客户端。None 则自动创建。
@@ -54,9 +54,9 @@ class AnswerGenerator:
     def generate_stream(
         self,
         question: str,
-        sources: List[SourceChunk],
+        sources: list[SourceChunk],
         method: str = "mqe+hyde",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> Generator[str, None, None]:
         """流式生成带引用的答案。
 
@@ -92,9 +92,9 @@ class AnswerGenerator:
     def generate(
         self,
         question: str,
-        sources: List[SourceChunk],
+        sources: list[SourceChunk],
         method: str = "mqe+hyde",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> str:
         """同步生成完整答案（非流式）。
 
@@ -127,9 +127,9 @@ class AnswerGenerator:
     def _build_messages(
         self,
         question: str,
-        sources: List[SourceChunk],
-        system_prompt: Optional[str] = None,
-    ) -> List[dict]:
+        sources: list[SourceChunk],
+        system_prompt: str | None = None,
+    ) -> list[dict]:
         """构建 LLM 消息列表（system + user）。
 
         Args:
@@ -154,7 +154,7 @@ class AnswerGenerator:
         ]
 
     @staticmethod
-    def _build_context(sources: List[SourceChunk]) -> str:
+    def _build_context(sources: list[SourceChunk]) -> str:
         """构建上下文字符串（编号的文档片段）。
 
         每个分块格式：:
@@ -168,7 +168,7 @@ class AnswerGenerator:
         Returns:
             格式化的上下文字符串。
         """
-        blocks: List[str] = []
+        blocks: list[str] = []
 
         for i, src in enumerate(sources, 1):
             location = src.location_text or "未知位置"

@@ -8,7 +8,6 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import List
 
 from src.core.vector_store import SearchResult
 
@@ -34,7 +33,7 @@ class BaseRetriever(ABC):
         self,
         question: str,
         top_k: int = 10,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """异步检索——子类实现。
 
         Args:
@@ -50,7 +49,7 @@ class BaseRetriever(ABC):
         self,
         question: str,
         top_k: int = 10,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """同步检索（自动管理事件循环）。
 
         Args:
@@ -61,7 +60,7 @@ class BaseRetriever(ABC):
             SearchResult 列表，按分数降序排列。
         """
         try:
-            loop = asyncio.get_running_loop()
+            _ = asyncio.get_running_loop()  # 仅检测是否有运行中的事件循环
             # 已有运行中的事件循环（如在 Jupyter/Streamlit 中）
             # 使用 nest_asyncio 或新建线程中的 loop
             import concurrent.futures

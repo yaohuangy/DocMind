@@ -9,10 +9,8 @@
 import hashlib
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from src.core.chunker import TextChunker
-from src.core.config import get_config
 from src.core.embedder import BaseEmbedder, create_embedder
 from src.core.metadata_store import MetadataStore
 from src.core.vector_store import VectorStore
@@ -43,11 +41,11 @@ class IngestPipeline:
 
     def __init__(
         self,
-        loader: Optional[MultiFormatLoader] = None,
-        chunker: Optional[TextChunker] = None,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
-        metadata_store: Optional[MetadataStore] = None,
+        loader: MultiFormatLoader | None = None,
+        chunker: TextChunker | None = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
+        metadata_store: MetadataStore | None = None,
     ) -> None:
         """
         所有参数均可选，None 时使用默认实例。
@@ -131,11 +129,11 @@ class IngestPipeline:
         logger.info("步骤3/4 嵌入完成: %d 个向量, 维度=%d", len(embeddings), len(embeddings[0]) if embeddings else 0)
 
         # ---- 4. 向量入库 ----
-        chunk_ids: List[str] = []
+        chunk_ids: list[str] = []
         for i, chunk in enumerate(chunks):
             # 用全局序号确保唯一（PDF 等多页文档每页 chunk_index 从 0 开始会重复）
             cid = hashlib.sha256(
-                f"{source}:{i}".encode("utf-8")
+                f"{source}:{i}".encode()
             ).hexdigest()[:16]
             chunk_ids.append(cid)
 
@@ -184,7 +182,7 @@ class IngestPipeline:
         logger.info("=== 摄入完成: %s ===", result)
         return result
 
-    def ingest_batch(self, sources: List[str], user_id: str = "default") -> List["IngestResult"]:
+    def ingest_batch(self, sources: list[str], user_id: str = "default") -> list["IngestResult"]:
         """批量摄入多个文档。
 
         每个文档独立处理，一个失败不影响后续。
@@ -195,7 +193,7 @@ class IngestPipeline:
         Returns:
             IngestResult 列表（仅包含成功的）。
         """
-        results: List[IngestResult] = []
+        results: list[IngestResult] = []
         for i, source in enumerate(sources, 1):
             logger.info("批量摄入 [%d/%d]: %s", i, len(sources), source)
             try:

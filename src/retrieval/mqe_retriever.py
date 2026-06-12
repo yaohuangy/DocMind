@@ -10,7 +10,6 @@ MQE（多查询扩展）检索器。
 
 import asyncio
 import logging
-from typing import List, Optional
 
 from src.core.embedder import BaseEmbedder, create_embedder
 from src.core.llm_client import LLMClient
@@ -35,11 +34,11 @@ class MQERetriever(BaseRetriever):
 
     def __init__(
         self,
-        llm_client: Optional[LLMClient] = None,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
+        llm_client: LLMClient | None = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
         num_variants: int = 4,
-        where_filter: Optional[dict] = None,
+        where_filter: dict | None = None,
     ) -> None:
         """
         Args:
@@ -59,7 +58,7 @@ class MQERetriever(BaseRetriever):
         self,
         question: str,
         top_k: int = 10,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """MQE 检索——变体生成 → 多路并行检索 → RRF 融合。
 
         Args:

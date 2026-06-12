@@ -7,7 +7,6 @@ BeautifulSoup 作为回退方案。
 """
 
 import logging
-from typing import List, Optional
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -31,7 +30,7 @@ class WebParser(BaseParser):
     def supported_format(self) -> str:
         return "web"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """抓取并解析网页。
 
         Args:
@@ -94,7 +93,7 @@ class WebParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _fetch_html(url: str, timeout: int = 15) -> Optional[str]:
+    def _fetch_html(url: str, timeout: int = 15) -> str | None:
         """下载网页 HTML 源码。
 
         Args:

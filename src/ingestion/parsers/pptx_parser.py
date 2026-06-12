@@ -6,7 +6,6 @@ PowerPoint (.pptx) 文档解析器。
 """
 
 import logging
-from typing import List
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -30,7 +29,7 @@ class PptxParser(BaseParser):
     def supported_format(self) -> str:
         return "pptx"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 .pptx 文件。
 
         Args:
@@ -47,7 +46,7 @@ class PptxParser(BaseParser):
 
         doc_id = make_doc_id(source)
         doc_name = self._source_name(source)
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
 
         try:
             prs = Presentation(source)
@@ -60,7 +59,7 @@ class PptxParser(BaseParser):
 
         for slide_idx, slide in enumerate(prs.slides):
             # 提取所有文本框
-            texts: List[str] = []
+            texts: list[str] = []
             slide_title = ""
 
             for shape in slide.shapes:
@@ -105,7 +104,7 @@ class PptxParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def parse_via_llamaindex(source: str) -> List[LlamaDocument]:
+    def parse_via_llamaindex(source: str) -> list[LlamaDocument]:
         """使用 LlamaIndex PptxReader 作为备选方案。
 
         Args:

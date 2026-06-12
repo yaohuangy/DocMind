@@ -8,7 +8,6 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -112,7 +111,7 @@ class Settings:
 # 全局单例
 # ---------------------------------------------------------------------------
 
-_config_singleton: Optional[Settings] = None
+_config_singleton: Settings | None = None
 
 
 def _env(key: str, default: str = "") -> str:

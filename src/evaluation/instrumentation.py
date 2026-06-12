@@ -6,7 +6,6 @@
 """
 
 import time
-from typing import List
 
 from src.core.embedder import BaseEmbedder
 from src.core.llm_client import LLMClient
@@ -35,7 +34,7 @@ class InstrumentedLLMClient:
 
     def generate_query_variants(
         self, question: str, num_variants: int = 4
-    ) -> List[str]:
+    ) -> list[str]:
         t0 = time.perf_counter()
         result = self._wrapped.generate_query_variants(question, num_variants)
         self.variant_gen_time = time.perf_counter() - t0
@@ -77,14 +76,14 @@ class InstrumentedEmbedder:
         self.last_embed_query_time: float = 0.0
         self._embed_count: int = 0
 
-    def embed(self, texts: List[str]) -> List[List[float]]:
+    def embed(self, texts: list[str]) -> list[list[float]]:
         t0 = time.perf_counter()
         result = self._wrapped.embed(texts)
         self.last_embed_time = time.perf_counter() - t0
         self._embed_count += 1
         return result
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         t0 = time.perf_counter()
         result = self._wrapped.embed_query(text)
         self.last_embed_query_time = time.perf_counter() - t0

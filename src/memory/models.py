@@ -8,8 +8,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # 工作记忆
@@ -29,11 +28,11 @@ class WorkingMemoryEntry:
 
     question: str
     answer: str = ""
-    sources: List[str] = field(default_factory=list)
-    concepts: List[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
+    concepts: list[str] = field(default_factory=list)
     timestamp: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "question": self.question,
             "answer": self.answer,
@@ -43,7 +42,7 @@ class WorkingMemoryEntry:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "WorkingMemoryEntry":
+    def from_dict(cls, d: dict[str, Any]) -> "WorkingMemoryEntry":
         return cls(
             question=d.get("question", ""),
             answer=d.get("answer", ""),
@@ -80,9 +79,9 @@ class EpisodicMemoryRecord:
     record_id: str = ""
     question: str = ""
     answer_summary: str = ""
-    source_chunks: List[str] = field(default_factory=list)
-    documents: List[str] = field(default_factory=list)
-    concepts_extracted: List[str] = field(default_factory=list)
+    source_chunks: list[str] = field(default_factory=list)
+    documents: list[str] = field(default_factory=list)
+    concepts_extracted: list[str] = field(default_factory=list)
     importance: float = 0.5
     session_id: str = ""
     user_id: str = "default_user"
@@ -97,7 +96,7 @@ class EpisodicMemoryRecord:
         """
         return f"问题: {self.question}\n答案摘要: {self.answer_summary}"
 
-    def to_metadata(self) -> Dict[str, Any]:
+    def to_metadata(self) -> dict[str, Any]:
         """转为 ChromaDB metadata 字典（仅基本类型值）。"""
         return {
             "memory_type": "episodic",
@@ -114,7 +113,7 @@ class EpisodicMemoryRecord:
         }
 
     @classmethod
-    def from_metadata(cls, meta: Dict[str, Any], record_id: str = "") -> "EpisodicMemoryRecord":
+    def from_metadata(cls, meta: dict[str, Any], record_id: str = "") -> "EpisodicMemoryRecord":
         """从 ChromaDB metadata 字典还原。
 
         Args:
@@ -173,7 +172,7 @@ class ConceptNode:
     first_encountered: str = ""
     frequency: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "type": self.concept_type,
@@ -183,7 +182,7 @@ class ConceptNode:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ConceptNode":
+    def from_dict(cls, d: dict[str, Any]) -> "ConceptNode":
         return cls(
             name=d.get("name", ""),
             concept_type=d.get("type", "concept"),

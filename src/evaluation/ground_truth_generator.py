@@ -15,9 +15,7 @@ import random
 from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import List, Optional
 
-from src.core.embedder import create_embedder
 from src.core.llm_client import LLMClient
 from src.core.vector_store import SearchResult, VectorStore
 from src.evaluation.models import EvalQuestion
@@ -81,8 +79,8 @@ class GroundTruthGenerator:
 
     def __init__(
         self,
-        llm_client: Optional[LLMClient] = None,
-        vector_store: Optional[VectorStore] = None,
+        llm_client: LLMClient | None = None,
+        vector_store: VectorStore | None = None,
     ) -> None:
         """
         Args:
@@ -103,7 +101,7 @@ class GroundTruthGenerator:
         delay_between_calls: float = 0.3,
         rewrite: bool = False,
         expand_gt: bool = False,
-    ) -> List[EvalQuestion]:
+    ) -> list[EvalQuestion]:
         """生成评测数据集。
 
         Args:
@@ -137,8 +135,8 @@ class GroundTruthGenerator:
             raise RuntimeError("采样失败，未能获取任何分块。")
 
         # 3. 为每个分块生成问题
-        questions: List[EvalQuestion] = []
-        seen_questions: List[str] = []
+        questions: list[EvalQuestion] = []
+        seen_questions: list[str] = []
 
         for i, chunk in enumerate(sampled):
             if len(questions) >= num_questions:
@@ -208,7 +206,7 @@ class GroundTruthGenerator:
     # 内部方法
     # ------------------------------------------------------------------
 
-    def _sample_chunks(self, n: int) -> List[SearchResult]:
+    def _sample_chunks(self, n: int) -> list[SearchResult]:
         """从 ChromaDB 随机采样 n 个分块。
 
         Args:
@@ -233,7 +231,7 @@ class GroundTruthGenerator:
             n = min(n, total)
             indices = random.sample(range(total), n)
 
-            results: List[SearchResult] = []
+            results: list[SearchResult] = []
             for idx in indices:
                 cid = data["ids"][idx]
                 text = (data["documents"][idx] if data.get("documents") else "")
@@ -308,7 +306,7 @@ class GroundTruthGenerator:
             logger.warning("LLM 问题改写失败: %s", e)
             return ""
 
-    def _expand_gt_chunks(self, source_chunk: SearchResult) -> List[str]:
+    def _expand_gt_chunks(self, source_chunk: SearchResult) -> list[str]:
         """将 GT 从单个分块扩展为同文档的相邻分块。
 
         找到与 source_chunk 属于同一 doc_id 的分块，
@@ -368,7 +366,7 @@ class GroundTruthGenerator:
         return gt_ids
 
     @staticmethod
-    def _is_duplicate(question: str, existing: List[str]) -> bool:
+    def _is_duplicate(question: str, existing: list[str]) -> bool:
         """检查问题是否与已有问题过于相似。
 
         Args:
@@ -385,7 +383,7 @@ class GroundTruthGenerator:
         return False
 
     @staticmethod
-    def _save(questions: List[EvalQuestion], output_path: str) -> None:
+    def _save(questions: list[EvalQuestion], output_path: str) -> None:
         """保存数据集到 JSON。
 
         Args:

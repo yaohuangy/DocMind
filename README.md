@@ -463,7 +463,7 @@ pytest tests/ -v
 ### 🚧 企业部署能力
 - ✅ **Docker 容器化**：编写 Dockerfile + `docker-compose.yml`（含 ChromaDB + Neo4j 依赖），支持 `docker-compose up` 一键启动全栈服务。
 - ✅ **Railway 云端部署**：项目已部署上线，支持公网访问、持久化存储、Neo4j AuraDB 知识图谱。
-- 🚧 **CI/CD 自动化**：GitHub Actions 自动跑代码质量检查（Ruff/mypy）和小型集成测试，保障合并质量。
+- ✅ **CI/CD 自动化**：GitHub Actions 自动跑 Ruff 代码检查 + mypy 类型检查 + pytest 单元测试，Push/PR 触发。
 
 ### 🚧 RAG 评测体系完善
 - ✅ **检索阶段评测**：Recall@K / Precision@K / MRR / NDCG / P50-P95 延迟（已实现）。

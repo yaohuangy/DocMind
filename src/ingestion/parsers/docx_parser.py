@@ -6,7 +6,6 @@ Word (.docx) 文档解析器。
 """
 
 import logging
-from typing import List
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -31,7 +30,7 @@ class DocxParser(BaseParser):
     def supported_format(self) -> str:
         return "docx"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 .docx 文件。
 
         Args:
@@ -48,7 +47,7 @@ class DocxParser(BaseParser):
 
         doc_id = make_doc_id(source)
         doc_name = self._source_name(source)
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
 
         try:
             docx = DocxDocument(source)
@@ -117,7 +116,7 @@ class DocxParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def parse_via_llamaindex(source: str) -> List[LlamaDocument]:
+    def parse_via_llamaindex(source: str) -> list[LlamaDocument]:
         """使用 LlamaIndex DocxReader 作为备选方案。
 
         Args:

@@ -10,7 +10,6 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 from openai import OpenAI
 
@@ -30,7 +29,7 @@ class BaseEmbedder(ABC):
     """
 
     @abstractmethod
-    def embed(self, texts: List[str]) -> List[List[float]]:
+    def embed(self, texts: list[str]) -> list[list[float]]:
         """将多个文本批量转为嵌入向量。
 
         Args:
@@ -42,7 +41,7 @@ class BaseEmbedder(ABC):
         ...
 
     @abstractmethod
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """将单个查询文本转为嵌入向量。
 
         Args:
@@ -71,7 +70,7 @@ class APIEmbedder(BaseEmbedder):
     支持批量请求，自动处理空文本。
     """
 
-    def __init__(self, config: Optional[EmbeddingConfig] = None):
+    def __init__(self, config: EmbeddingConfig | None = None):
         """
         Args:
             config: 嵌入配置。为 None 时自动从全局配置加载。
@@ -88,7 +87,7 @@ class APIEmbedder(BaseEmbedder):
         self._model = config.model
         self._batch_size = config.batch_size or 32
 
-    def embed(self, texts: List[str]) -> List[List[float]]:
+    def embed(self, texts: list[str]) -> list[list[float]]:
         """批量嵌入文本。
 
         Args:
@@ -103,7 +102,7 @@ class APIEmbedder(BaseEmbedder):
         # 去掉首尾空白，但保留空字符串（后续会处理）
         cleaned = [t.strip() for t in texts]
 
-        all_embeddings: List[List[float]] = []
+        all_embeddings: list[list[float]] = []
 
         # 分批请求
         for i in range(0, len(cleaned), self._batch_size):
@@ -121,7 +120,7 @@ class APIEmbedder(BaseEmbedder):
 
         return all_embeddings
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """嵌入单个查询文本。
 
         Args:
@@ -163,7 +162,7 @@ class LocalEmbedder(BaseEmbedder):
     推荐模型: all-MiniLM-L6-v2（384维）、bge-small-zh（512维）等。
     """
 
-    def __init__(self, config: Optional[EmbeddingConfig] = None):
+    def __init__(self, config: EmbeddingConfig | None = None):
         """
         Args:
             config: 嵌入配置。为 None 时自动从全局配置加载。
@@ -185,7 +184,7 @@ class LocalEmbedder(BaseEmbedder):
         self._model = SentenceTransformer(self._model_name)
         logger.info("模型加载完成，维度=%d", self.dimension)
 
-    def embed(self, texts: List[str]) -> List[List[float]]:
+    def embed(self, texts: list[str]) -> list[list[float]]:
         """批量嵌入文本。
 
         Args:
@@ -209,7 +208,7 @@ class LocalEmbedder(BaseEmbedder):
         )
         return embeddings.tolist()
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """嵌入单个查询文本。"""
         return self.embed([text])[0]
 
@@ -225,7 +224,7 @@ class LocalEmbedder(BaseEmbedder):
 # 工厂函数
 # ---------------------------------------------------------------------------
 
-def create_embedder(config: Optional[EmbeddingConfig] = None) -> BaseEmbedder:
+def create_embedder(config: EmbeddingConfig | None = None) -> BaseEmbedder:
     """根据配置创建嵌入器实例。
 
     Args:

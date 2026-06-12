@@ -13,22 +13,19 @@ Usage::
         print(token, end="", flush=True)
 """
 
-import asyncio
 import logging
-from datetime import datetime
-from typing import Generator, List, Optional
+from collections.abc import Generator
 
 from src.core.config import Settings, get_config
-from src.core.embedder import BaseEmbedder, create_embedder
+from src.core.embedder import create_embedder
 from src.core.llm_client import LLMClient
 from src.core.metadata_store import MetadataStore
 from src.core.vector_store import SearchResult, VectorStore
 from src.engine.models import AnswerResult, IngestResult, SourceChunk
 from src.generation.answer_generator import AnswerGenerator
 from src.generation.citation_formatter import CitationFormatter
-from src.ingestion.ingest_pipeline import IngestPipeline, IngestResult as PipeIngestResult
+from src.ingestion.ingest_pipeline import IngestPipeline
 from src.memory.memory_manager import MemoryManager
-from src.memory.working_memory import WorkingMemory
 from src.retrieval.base_retriever import BaseRetriever
 from src.retrieval.combined_retriever import CombinedRetriever
 from src.retrieval.direct_retriever import DirectRetriever
@@ -50,7 +47,7 @@ class QAEngine:
     所有方法均为同步（内部异步操作通过 asyncio.run 处理）。
     """
 
-    def __init__(self, config: Optional[Settings] = None) -> None:
+    def __init__(self, config: Settings | None = None) -> None:
         """
         Args:
             config: 全局配置。None 则自动加载。
@@ -149,7 +146,7 @@ class QAEngine:
             logger.exception("摄入异常: %s", e)
             raise
 
-    def ingest_batch(self, sources: List[str]) -> List[IngestResult]:
+    def ingest_batch(self, sources: list[str]) -> list[IngestResult]:
         """批量摄入文档。
 
         Args:
@@ -193,7 +190,7 @@ class QAEngine:
         question: str,
         method: str = "mqe+hyde",
         top_k: int = 10,
-    ) -> List[SourceChunk]:
+    ) -> list[SourceChunk]:
         """根据问题检索相关文档分块。
 
         Args:
@@ -240,7 +237,7 @@ class QAEngine:
     def generate_stream(
         self,
         question: str,
-        sources: List[SourceChunk],
+        sources: list[SourceChunk],
         method: str = "mqe+hyde",
     ) -> Generator[str, None, None]:
         """流式生成带引用的答案。
@@ -264,7 +261,7 @@ class QAEngine:
     def generate(
         self,
         question: str,
-        sources: List[SourceChunk],
+        sources: list[SourceChunk],
         method: str = "mqe+hyde",
     ) -> str:
         """同步生成完整答案。
@@ -290,7 +287,7 @@ class QAEngine:
     def format_answer(
         self,
         raw_answer: str,
-        sources: List[SourceChunk],
+        sources: list[SourceChunk],
     ) -> tuple:
         """格式化答案中的引用标记，并重新映射编号。
 
@@ -447,8 +444,8 @@ class QAEngine:
 
     def record_interaction(
         self, question: str, answer: str,
-        sources: Optional[List[SourceChunk]] = None,
-        concepts: Optional[List[str]] = None,
+        sources: list[SourceChunk] | None = None,
+        concepts: list[str] | None = None,
     ) -> None:
         """记录一次问答交互到三记忆系统。"""
         if self.memory is None:
@@ -463,7 +460,7 @@ class QAEngine:
             st.warning(f"记忆记录失败: {e}")
 
     def add_note(
-        self, content: str, related_concepts: Optional[List[str]] = None
+        self, content: str, related_concepts: list[str] | None = None
     ) -> str:
         """添加学习笔记。"""
         if self.memory is None:
@@ -579,7 +576,7 @@ class QAEngine:
         """清除持久化的聊天记录。"""
         self._metadata_store.clear_conversation(self._user_id)
 
-    def get_feedback_stats(self, method: Optional[str] = None) -> dict:
+    def get_feedback_stats(self, method: str | None = None) -> dict:
         """获取当前用户的反馈统计。
 
         Args:
@@ -606,7 +603,7 @@ class QAEngine:
             return None
         return self.memory.working
 
-    def list_documents(self, doc_format: Optional[str] = None) -> List[dict]:
+    def list_documents(self, doc_format: str | None = None) -> list[dict]:
         """列出已加载的文档（仅当前用户）。
 
         Args:
@@ -713,7 +710,7 @@ class QAEngine:
         return self._retrievers[method_key]
 
     @staticmethod
-    def _to_source_chunks(results: List[SearchResult]) -> List[SourceChunk]:
+    def _to_source_chunks(results: list[SearchResult]) -> list[SourceChunk]:
         """将 SearchResult 列表转为 SourceChunk 列表（含位置描述）。
 
         Args:

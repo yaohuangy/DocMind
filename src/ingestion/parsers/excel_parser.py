@@ -7,7 +7,6 @@ Excel (.xlsx) 文档解析器。
 
 import logging
 from pathlib import Path
-from typing import List
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -33,7 +32,7 @@ class ExcelParser(BaseParser):
     def supported_format(self) -> str:
         return "xlsx"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 .xlsx 文件。
 
         Args:
@@ -62,14 +61,14 @@ class ExcelParser(BaseParser):
             logger.error("无法打开 Excel 文件 %s: %s", source, e)
             return []
 
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
         total_rows = 0
 
         for sheet_name in wb.sheetnames:
             ws = wb[sheet_name]
 
             # 收集所有行（含表头）
-            all_rows: List[List[str]] = []
+            all_rows: list[list[str]] = []
             for row in ws.iter_rows(values_only=True):
                 # 转换所有单元格为字符串
                 str_row = [str(cell) if cell is not None else "" for cell in row]
@@ -86,7 +85,7 @@ class ExcelParser(BaseParser):
             data_rows = all_rows[1:]
 
             for row_idx, row in enumerate(data_rows):
-                parts: List[str] = []
+                parts: list[str] = []
                 for col_idx, value in enumerate(row):
                     col_name = (
                         headers[col_idx]
@@ -128,7 +127,7 @@ class ExcelParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def parse_via_llamaindex(source: str) -> List[LlamaDocument]:
+    def parse_via_llamaindex(source: str) -> list[LlamaDocument]:
         """使用 openpyxl 直接读取（备选，保持接口一致）。
 
         Args:

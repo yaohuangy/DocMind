@@ -15,7 +15,7 @@ Usage::
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from neo4j import GraphDatabase
 from neo4j.exceptions import Neo4jError, ServiceUnavailable
@@ -41,7 +41,7 @@ class GraphStore:
             store.close()
     """
 
-    def __init__(self, config: Optional[Neo4jConfig] = None):
+    def __init__(self, config: Neo4jConfig | None = None):
         """
         Args:
             config: Neo4j 配置。为 None 时自动从全局配置加载。
@@ -104,9 +104,9 @@ class GraphStore:
     def run_query(
         self,
         query: str,
-        params: Optional[Dict[str, Any]] = None,
-        database: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        params: dict[str, Any] | None = None,
+        database: str | None = None,
+    ) -> list[dict[str, Any]]:
         """执行 Cypher 查询并返回结果列表。
 
         Args:
@@ -130,9 +130,9 @@ class GraphStore:
     def execute_write(
         self,
         query: str,
-        params: Optional[Dict[str, Any]] = None,
-        database: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        params: dict[str, Any] | None = None,
+        database: str | None = None,
+    ) -> list[dict[str, Any]]:
         """执行写事务（Cypher 查询）。
 
         Args:
@@ -195,7 +195,7 @@ class GraphStore:
         description: str = "",
         first_encountered: str = "",
         user_id: str = "default",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """创建或更新概念节点（MERGE 语义）。
 
         Args:
@@ -234,7 +234,7 @@ class GraphStore:
             return result[0].get("concept", {})
         return {}
 
-    def get_concept(self, name: str, user_id: str = "") -> Optional[Dict[str, Any]]:
+    def get_concept(self, name: str, user_id: str = "") -> dict[str, Any] | None:
         """按名称（和可选用户）查询概念节点。
 
         Args:
@@ -260,7 +260,7 @@ class GraphStore:
 
     def search_concepts(
         self, keyword: str, limit: int = 20, user_id: str = "",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """按关键词搜索概念（模糊匹配）。
 
         Args:
@@ -444,7 +444,7 @@ class GraphStore:
 
     def get_neighbourhood(
         self, concept_name: str, depth: int = 1
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取概念的邻域子图。
 
         Args:
@@ -463,7 +463,7 @@ class GraphStore:
         )
         return results
 
-    def get_all_concepts(self, limit: int = 100, user_id: str = "") -> List[Dict[str, Any]]:
+    def get_all_concepts(self, limit: int = 100, user_id: str = "") -> list[dict[str, Any]]:
         """获取所有概念节点（按频率降序）。
 
         Args:
@@ -498,7 +498,7 @@ class GraphStore:
 
     def get_user_graph_data(
         self, user_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取用户的知识图谱数据（节点 + 关系），供可视化使用。
 
         返回当前用户在 Neo4j 中的所有 Concept 节点及 RELATES_TO 关系，
@@ -616,7 +616,7 @@ class GraphStore:
 
     def get_user_graph_data_top_n(
         self, user_id: str, top_n: int = 10
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取用户的知识图谱数据（仅 Top-N 概念），供可视化使用。
 
         与 get_user_graph_data 类似，但仅返回频率最高的 top_n 个概念节点
@@ -652,7 +652,7 @@ class GraphStore:
 
         # 查询这些 top_n 概念之间的 RELATES_TO 关系
         top_names = [n["name"] for n in nodes]
-        edges: List[Dict[str, Any]] = []
+        edges: list[dict[str, Any]] = []
         if len(top_names) >= 2:
             edge_results = self.run_query(
                 """

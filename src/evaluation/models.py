@@ -5,7 +5,6 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 
 @dataclass
@@ -20,7 +19,7 @@ class EvalQuestion:
     """
 
     question: str
-    relevant_chunk_ids: List[str] = field(default_factory=list)
+    relevant_chunk_ids: list[str] = field(default_factory=list)
     doc_id: str = ""
     source_chunk_text: str = ""
 
@@ -40,10 +39,10 @@ class PerQuestionResult:
 
     question: str
     method: str
-    retrieved_chunk_ids: List[str] = field(default_factory=list)
-    retrieved_scores: List[float] = field(default_factory=list)
+    retrieved_chunk_ids: list[str] = field(default_factory=list)
+    retrieved_scores: list[float] = field(default_factory=list)
     total_latency_sec: float = 0.0
-    phase_timings: Dict[str, float] = field(default_factory=dict)
+    phase_timings: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -89,6 +88,6 @@ class EvalReport:
 
     dataset_path: str = ""
     num_questions: int = 0
-    methods: List[MethodMetrics] = field(default_factory=list)
-    per_question: List[PerQuestionResult] = field(default_factory=list)
+    methods: list[MethodMetrics] = field(default_factory=list)
+    per_question: list[PerQuestionResult] = field(default_factory=list)
     generated_at: str = ""

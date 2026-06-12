@@ -7,7 +7,7 @@ LLM 客户端模块。
 """
 
 import logging
-from typing import Generator, List, Optional
+from collections.abc import Generator
 
 from openai import OpenAI
 
@@ -72,7 +72,7 @@ class LLMClient:
             print(token, end="", flush=True)
     """
 
-    def __init__(self, llm_config: Optional[LLMConfig] = None):
+    def __init__(self, llm_config: LLMConfig | None = None):
         """
         Args:
             llm_config: LLM 配置。为 None 时自动从全局配置加载。
@@ -92,9 +92,9 @@ class LLMClient:
 
     def chat(
         self,
-        messages: List[dict],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """同步对话，返回完整回复文本。
 
@@ -118,9 +118,9 @@ class LLMClient:
 
     def chat_stream(
         self,
-        messages: List[dict],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> Generator[str, None, None]:
         """流式对话，逐 token yield。
 
@@ -153,7 +153,7 @@ class LLMClient:
         self,
         question: str,
         num_variants: int = 4,
-    ) -> List[str]:
+    ) -> list[str]:
         """生成查询变体（MQE 用），从 4 个角度重述原问题。
 
         角度：定义角度 / 机制角度 / 对比角度 / 应用角度。
@@ -183,7 +183,7 @@ class LLMClient:
                 # 移除 ```json ... ``` 包裹
                 lines = text.split("\n")
                 text = "\n".join(lines[1:-1]) if len(lines) > 2 else text
-            variants: List[str] = _json.loads(text)
+            variants: list[str] = _json.loads(text)
             # 确保至少返回 num_variants 条
             variants = variants[:num_variants]
             logger.info("生成 %d 条查询变体", len(variants))
@@ -214,7 +214,7 @@ class LLMClient:
     def extract_concepts(
         self,
         text: str,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """从文本中提取关键概念（语义记忆构建用）。
 
         使用逗号分隔的纯文本格式，兼容所有模型。
@@ -233,7 +233,7 @@ class LLMClient:
         response = self.chat(messages, temperature=0.3, max_tokens=1024)
         print(f"[EXTRACT] LLM 原始响应 ({len(response)} 字符):\n{response[:400]}")
 
-        concepts: List[dict] = []
+        concepts: list[dict] = []
         for line in response.strip().split("\n"):
             line = line.strip()
             if not line or line.startswith("```"):

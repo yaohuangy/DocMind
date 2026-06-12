@@ -8,7 +8,6 @@
 
 import hashlib
 from abc import ABC, abstractmethod
-from typing import List
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -32,7 +31,7 @@ class BaseParser(ABC):
     """
 
     @abstractmethod
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析文档，返回 LlamaDocument 列表。
 
         每个 LlamaDocument 包含：

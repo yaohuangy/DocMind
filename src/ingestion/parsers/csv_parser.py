@@ -8,7 +8,6 @@ CSV 文档解析器。
 import csv
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -32,7 +31,7 @@ class CSVParser(BaseParser):
     def supported_format(self) -> str:
         return "csv"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 CSV 文件。
 
         Args:
@@ -65,11 +64,11 @@ class CSVParser(BaseParser):
         headers = rows[0]
         data_rows = rows[1:]
 
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
 
         for row_idx, row in enumerate(data_rows):
             # 构建 "col: value" 格式文本
-            parts: List[str] = []
+            parts: list[str] = []
             for col_idx, value in enumerate(row):
                 col_name = headers[col_idx] if col_idx < len(headers) else f"Column{col_idx}"
                 parts.append(f"{col_name}: {value}")
@@ -115,7 +114,7 @@ class CSVParser(BaseParser):
             return "utf-8"
 
     @staticmethod
-    def _parse_csv(text: str) -> List[List[str]]:
+    def _parse_csv(text: str) -> list[list[str]]:
         """解析 CSV 文本，自动检测分隔符。
 
         优先尝试 CSV sniffing，失败则回退到逗号分隔。

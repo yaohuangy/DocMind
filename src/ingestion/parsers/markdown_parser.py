@@ -8,7 +8,6 @@ Markdown (.md) 文档解析器。
 import logging
 import re
 from pathlib import Path
-from typing import List, Tuple
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -32,7 +31,7 @@ class MarkdownParser(BaseParser):
     def supported_format(self) -> str:
         return "md"
 
-    def parse(self, source: str) -> List[LlamaDocument]:
+    def parse(self, source: str) -> list[LlamaDocument]:
         """解析 Markdown 文件。
 
         Args:
@@ -65,7 +64,7 @@ class MarkdownParser(BaseParser):
 
         # 按标题分割
         sections = self._split_by_headings(text)
-        documents: List[LlamaDocument] = []
+        documents: list[LlamaDocument] = []
 
         for heading_path, content in sections:
             if not content.strip():
@@ -95,7 +94,7 @@ class MarkdownParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _split_by_headings(text: str) -> List[Tuple[str, str]]:
+    def _split_by_headings(text: str) -> list[tuple[str, str]]:
         """按 Markdown 标题（# ~ ######）分割文本。
 
         构建每个段落对应的 heading_path，例如：
@@ -111,9 +110,9 @@ class MarkdownParser(BaseParser):
         heading_pattern = re.compile(r"^(#{1,6})\s+(.+)$")
 
         # 构建标题层级栈: [(level, title), ...]
-        heading_stack: List[Tuple[int, str]] = []
-        sections: List[Tuple[str, str]] = []
-        current_lines: List[str] = []
+        heading_stack: list[tuple[int, str]] = []
+        sections: list[tuple[str, str]] = []
+        current_lines: list[str] = []
 
         for line in lines:
             match = heading_pattern.match(line)

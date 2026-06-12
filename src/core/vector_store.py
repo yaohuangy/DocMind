@@ -12,10 +12,10 @@ Collections 设计（见 spec §8.2）：
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import chromadb
-from chromadb.api.types import Embedding, Metadata
+from chromadb.api.types import Metadata
 
 from src.core.config import ChromaConfig, get_config
 
@@ -40,7 +40,7 @@ class SearchResult:
     chunk_id: str
     text: str
     score: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ class VectorStore:
     DOCUMENT_CHUNKS = "document_chunks"
     EPISODIC_MEMORY = "episodic_memory"
 
-    def __init__(self, config: Optional[ChromaConfig] = None):
+    def __init__(self, config: ChromaConfig | None = None):
         """
         Args:
             config: ChromaDB 配置。为 None 时自动从全局配置加载。
@@ -136,10 +136,10 @@ class VectorStore:
     def add_chunks(
         self,
         collection_name: str,
-        ids: List[str],
-        texts: List[str],
-        embeddings: List[List[float]],
-        metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: list[str],
+        texts: list[str],
+        embeddings: list[list[float]],
+        metadatas: list[dict[str, Any]] | None = None,
     ) -> None:
         """批量添加分块到指定集合。
 
@@ -157,10 +157,10 @@ class VectorStore:
         collection = self.get_collection(collection_name)
 
         # ChromaDB 要求 metadatas 中的值都是基本类型
-        clean_metadatas: List[Metadata] = []
+        clean_metadatas: list[Metadata] = []
         if metadatas:
             for m in metadatas:
-                clean: Dict[str, Any] = {}
+                clean: dict[str, Any] = {}
                 for k, v in m.items():
                     if isinstance(v, (str, int, float, bool)):
                         clean[k] = v
@@ -179,10 +179,10 @@ class VectorStore:
     def search(
         self,
         collection_name: str,
-        query_embedding: List[float],
+        query_embedding: list[float],
         limit: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchResult]:
+        where: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
         """单查询向量检索。
 
         Args:
@@ -208,10 +208,10 @@ class VectorStore:
     async def search_batch(
         self,
         collection_name: str,
-        query_embeddings: List[List[float]],
+        query_embeddings: list[list[float]],
         limit: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-    ) -> List[List[SearchResult]]:
+        where: dict[str, Any] | None = None,
+    ) -> list[list[SearchResult]]:
         """批量检索（MQE 多路查询用）。
 
         使用 ``asyncio.to_thread`` 将 ChromaDB 同步调用转为异步，
@@ -227,7 +227,7 @@ class VectorStore:
             嵌套列表，外层与 query_embeddings 等长。
         """
 
-        async def _search_one(embedding: List[float]) -> List[SearchResult]:
+        async def _search_one(embedding: list[float]) -> list[SearchResult]:
             return await asyncio.to_thread(
                 self.search, collection_name, embedding, limit, where
             )
@@ -240,7 +240,7 @@ class VectorStore:
     # 删除与统计
     # ------------------------------------------------------------------
 
-    def delete_by_ids(self, collection_name: str, ids: List[str]) -> None:
+    def delete_by_ids(self, collection_name: str, ids: list[str]) -> None:
         """按 ID 删除分块。
 
         Args:
@@ -278,7 +278,7 @@ class VectorStore:
         except ValueError:
             logger.warning("集合 %s 不存在", collection_name)
 
-    def collection_stats(self, name: str) -> Dict[str, Any]:
+    def collection_stats(self, name: str) -> dict[str, Any]:
         """获取集合统计信息。
 
         Args:
@@ -301,9 +301,9 @@ class VectorStore:
     # 内部
     # ------------------------------------------------------------------
 
-    def _parse_results(self, raw: Dict) -> List[SearchResult]:
+    def _parse_results(self, raw: dict) -> list[SearchResult]:
         """将 ChromaDB 原始查询结果转为 SearchResult 列表。"""
-        results: List[SearchResult] = []
+        results: list[SearchResult] = []
         if not raw["ids"] or not raw["ids"][0]:
             return results
 

@@ -6,7 +6,6 @@
 """
 
 import logging
-from typing import List, Optional
 
 from src.core.embedder import BaseEmbedder, create_embedder
 from src.core.vector_store import SearchResult, VectorStore
@@ -28,9 +27,9 @@ class DirectRetriever(BaseRetriever):
 
     def __init__(
         self,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
-        where_filter: Optional[dict] = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
+        where_filter: dict | None = None,
     ) -> None:
         """
         Args:
@@ -46,7 +45,7 @@ class DirectRetriever(BaseRetriever):
         self,
         question: str,
         top_k: int = 10,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """直接向量检索。
 
         Args:

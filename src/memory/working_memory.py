@@ -9,7 +9,6 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from src.memory.models import WorkingMemoryEntry
 
@@ -44,8 +43,8 @@ class WorkingMemory:
         """
         self.session_id = session_id
         self.max_entries = max_entries
-        self._entries: List[WorkingMemoryEntry] = []
-        self._active_concepts: List[str] = []
+        self._entries: list[WorkingMemoryEntry] = []
+        self._active_concepts: list[str] = []
 
     # ------------------------------------------------------------------
     # 基本操作
@@ -55,8 +54,8 @@ class WorkingMemory:
         self,
         question: str,
         answer: str,
-        sources: Optional[List[str]] = None,
-        concepts: Optional[List[str]] = None,
+        sources: list[str] | None = None,
+        concepts: list[str] | None = None,
     ) -> None:
         """添加一轮 Q&A 到工作记忆。
 
@@ -112,7 +111,7 @@ class WorkingMemory:
             return ""
 
         recent = self._entries[-last_n:]
-        lines: List[str] = []
+        lines: list[str] = []
 
         for entry in recent:
             lines.append(f"用户: {entry.question}")
@@ -120,7 +119,7 @@ class WorkingMemory:
 
         return "\n---\n".join(lines)
 
-    def get_recent(self, n: int = 5) -> List[WorkingMemoryEntry]:
+    def get_recent(self, n: int = 5) -> list[WorkingMemoryEntry]:
         """获取最近 N 条记录。
 
         Args:
@@ -131,7 +130,7 @@ class WorkingMemory:
         """
         return self._entries[-n:]
 
-    def get_active_concepts(self) -> List[str]:
+    def get_active_concepts(self) -> list[str]:
         """获取当前会话中活跃的概念列表。
 
         Returns:
@@ -160,6 +159,6 @@ class WorkingMemory:
         return len(self._entries) == 0
 
     @property
-    def entries(self) -> List[WorkingMemoryEntry]:
+    def entries(self) -> list[WorkingMemoryEntry]:
         """所有条目（只读）。"""
         return list(self._entries)

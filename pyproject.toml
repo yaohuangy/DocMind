@@ -1,0 +1,48 @@
+[project]
+name = "docmind"
+description = "智能文档问答助手 — 基于 RAG 的多格式文档问答系统"
+requires-python = ">=3.10"
+readme = "README.md"
+
+# ============================================================================
+# Ruff — 代码风格检查
+# ============================================================================
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "W",     # pycodestyle warnings
+    "I",     # isort (import 排序)
+    "UP",    # pyupgrade (现代 Python 语法)
+]
+ignore = [
+    "E501",  # 行宽由 formatter 管理，ruff 不做硬限制
+    "E731",  # 允许简单 lambda
+    "E741",  # 允许短变量名如 l
+    "F841",  # 允许赋值未使用（调试/检测场景常见）
+    "UP028", # yield for 循环风格允许
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# ============================================================================
+# mypy — 类型检查
+# ============================================================================
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+warn_return_any = false
+warn_unused_ignores = false
+
+# ============================================================================
+# pytest — 测试
+# ============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

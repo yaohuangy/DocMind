@@ -12,7 +12,6 @@ HyDE（假设文档嵌入）检索器。
 
 import asyncio
 import logging
-from typing import List, Optional
 
 from src.core.embedder import BaseEmbedder, create_embedder
 from src.core.llm_client import LLMClient
@@ -36,10 +35,10 @@ class HyDERetriever(BaseRetriever):
 
     def __init__(
         self,
-        llm_client: Optional[LLMClient] = None,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
-        where_filter: Optional[dict] = None,
+        llm_client: LLMClient | None = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
+        where_filter: dict | None = None,
     ) -> None:
         """
         Args:
@@ -57,7 +56,7 @@ class HyDERetriever(BaseRetriever):
         self,
         question: str,
         top_k: int = 10,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """HyDE 检索——生成假设答案 → 嵌入 → 检索。
 
         Args:

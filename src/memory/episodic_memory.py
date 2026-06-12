@@ -10,7 +10,7 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.embedder import BaseEmbedder, create_embedder
 from src.core.vector_store import SearchResult, VectorStore
@@ -35,8 +35,8 @@ class EpisodicMemory:
 
     def __init__(
         self,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
     ) -> None:
         """
         Args:
@@ -58,14 +58,14 @@ class EpisodicMemory:
         self,
         question: str,
         answer_summary: str,
-        source_chunks: Optional[List[str]] = None,
-        documents: Optional[List[str]] = None,
-        concepts_extracted: Optional[List[str]] = None,
+        source_chunks: list[str] | None = None,
+        documents: list[str] | None = None,
+        concepts_extracted: list[str] | None = None,
         importance: float = 0.5,
         session_id: str = "",
         user_id: str = "default_user",
         event_type: str = "qa_interaction",
-        timestamp: Optional[str] = None,
+        timestamp: str | None = None,
     ) -> str:
         """记录一条 Q&A 交互到情景记忆。
 
@@ -131,9 +131,9 @@ class EpisodicMemory:
         query: str,
         limit: int = 10,
         min_importance: float = 0.0,
-        event_type: Optional[str] = None,
-        user_id: Optional[str] = None,
-    ) -> List[EpisodicMemoryRecord]:
+        event_type: str | None = None,
+        user_id: str | None = None,
+    ) -> list[EpisodicMemoryRecord]:
         """按关键词搜索情景记忆（语义搜索）。
 
         Args:
@@ -149,13 +149,13 @@ class EpisodicMemory:
         query_embedding = self._embedder.embed_query(query)
 
         # 构建 ChromaDB where 过滤条件
-        conditions: List[Dict[str, Any]] = []
+        conditions: list[dict[str, Any]] = []
         if event_type:
             conditions.append({"event_type": event_type})
         if user_id:
             conditions.append({"user_id": user_id})
 
-        where: Optional[Dict[str, Any]] = None
+        where: dict[str, Any] | None = None
         if len(conditions) == 1:
             where = conditions[0]
         elif len(conditions) > 1:
@@ -179,11 +179,11 @@ class EpisodicMemory:
 
     def search_by_time(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         limit: int = 50,
-        user_id: Optional[str] = None,
-    ) -> List[EpisodicMemoryRecord]:
+        user_id: str | None = None,
+    ) -> list[EpisodicMemoryRecord]:
         """按时间范围搜索情景记忆。
 
         通过 ChromaDB 的 metadata 过滤实现。
@@ -212,7 +212,7 @@ class EpisodicMemory:
         if not data["ids"]:
             return []
 
-        records: List[EpisodicMemoryRecord] = []
+        records: list[EpisodicMemoryRecord] = []
         for i, cid in enumerate(data["ids"]):
             meta = data["metadatas"][i] if data.get("metadatas") else {}
             record = EpisodicMemoryRecord.from_metadata(meta, record_id=cid)

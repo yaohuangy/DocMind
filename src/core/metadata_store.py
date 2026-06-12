@@ -14,7 +14,7 @@ import logging
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.config import SQLiteConfig, get_config
 
@@ -35,7 +35,7 @@ class MetadataStore:
         store.close()
     """
 
-    def __init__(self, config: Optional[SQLiteConfig] = None):
+    def __init__(self, config: SQLiteConfig | None = None):
         """
         Args:
             config: SQLite 配置。为 None 时自动从全局配置加载。
@@ -188,7 +188,7 @@ class MetadataStore:
         self._conn.commit()
         logger.info("文档已记录: %s (%s, %d chunks, user=%s)", name, doc_format, num_chunks, user_id)
 
-    def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
+    def get_document(self, doc_id: str) -> dict[str, Any] | None:
         """按 ID 查询单个文档。
 
         Args:
@@ -204,9 +204,9 @@ class MetadataStore:
 
     def list_documents(
         self,
-        doc_format: Optional[str] = None,
-        user_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        doc_format: str | None = None,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         """列出文档，可选按格式和用户过滤。
 
         Args:
@@ -217,7 +217,7 @@ class MetadataStore:
             文档字典列表，按加载时间降序排列。
         """
         query = "SELECT * FROM documents WHERE 1=1"
-        params: List[Any] = []
+        params: list[Any] = []
 
         if doc_format:
             query += " AND format = ?"
@@ -248,7 +248,7 @@ class MetadataStore:
             logger.info("文档已删除: %s", doc_id)
         return deleted
 
-    def get_document_count(self, doc_format: Optional[str] = None, user_id: Optional[str] = None) -> int:
+    def get_document_count(self, doc_format: str | None = None, user_id: str | None = None) -> int:
         """获取文档总数，可选按格式和用户过滤。
 
         Args:
@@ -259,7 +259,7 @@ class MetadataStore:
             文档数量。
         """
         query = "SELECT COUNT(*) as cnt FROM documents WHERE 1=1"
-        params: List[Any] = []
+        params: list[Any] = []
         if doc_format:
             query += " AND format = ?"
             params.append(doc_format)
@@ -303,10 +303,10 @@ class MetadataStore:
     def update_session(
         self,
         session_id: str,
-        end_time: Optional[str] = None,
-        num_questions: Optional[int] = None,
-        num_notes: Optional[int] = None,
-        num_documents: Optional[int] = None,
+        end_time: str | None = None,
+        num_questions: int | None = None,
+        num_notes: int | None = None,
+        num_documents: int | None = None,
     ) -> None:
         """更新会话统计信息。
 
@@ -317,8 +317,8 @@ class MetadataStore:
             num_notes: 笔记数。
             num_documents: 文档数。
         """
-        fields: List[str] = []
-        values: List[Any] = []
+        fields: list[str] = []
+        values: list[Any] = []
 
         if end_time is not None:
             fields.append("end_time = ?")
@@ -339,7 +339,7 @@ class MetadataStore:
             self._conn.execute(query, values)
             self._conn.commit()
 
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
         """查询会话信息。
 
         Args:
@@ -355,7 +355,7 @@ class MetadataStore:
 
     def list_sessions(
         self, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """列出最近的会话。
 
         Args:
@@ -370,7 +370,7 @@ class MetadataStore:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_session_count(self, user_id: Optional[str] = None) -> int:
+    def get_session_count(self, user_id: str | None = None) -> int:
         """获取会话总数。
 
         Args:
@@ -429,9 +429,9 @@ class MetadataStore:
 
     def get_feedback_stats(
         self,
-        user_id: Optional[str] = None,
-        method: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None = None,
+        method: str | None = None,
+    ) -> dict[str, Any]:
         """获取反馈统计数据。
 
         Args:
@@ -450,7 +450,7 @@ class MetadataStore:
             }
         """
         query = "SELECT * FROM feedback WHERE 1=1"
-        params: List[Any] = []
+        params: list[Any] = []
         if user_id:
             query += " AND user_id = ?"
             params.append(user_id)
@@ -469,7 +469,7 @@ class MetadataStore:
         not_useful = total - useful
 
         # 按方法分
-        by_method: Dict[str, Dict[str, Any]] = {}
+        by_method: dict[str, dict[str, Any]] = {}
         for r in records:
             m = r["method"]
             if m not in by_method:
@@ -503,7 +503,7 @@ class MetadataStore:
     # 会话消息持久化
     # ------------------------------------------------------------------
 
-    def save_conversation(self, user_id: str, messages: List[Dict[str, Any]]) -> None:
+    def save_conversation(self, user_id: str, messages: list[dict[str, Any]]) -> None:
         """持久化当前会话的聊天记录。
 
         Args:
@@ -526,7 +526,7 @@ class MetadataStore:
         )
         self._conn.commit()
 
-    def load_conversation(self, user_id: str) -> List[Dict[str, Any]]:
+    def load_conversation(self, user_id: str) -> list[dict[str, Any]]:
         """加载持久化的会话聊天记录。
 
         Args:
@@ -562,7 +562,7 @@ class MetadataStore:
     # 统计聚合
     # ------------------------------------------------------------------
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取全局统计快照。
 
         Returns:

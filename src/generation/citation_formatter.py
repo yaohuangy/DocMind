@@ -19,7 +19,6 @@
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
 
 from src.core.vector_store import SearchResult
 from src.engine.models import SourceChunk
@@ -52,8 +51,8 @@ class CitationFormatter:
     def format(
         self,
         raw_answer: str,
-        search_results: List[SearchResult],
-    ) -> Tuple[str, List[SourceChunk]]:
+        search_results: list[SearchResult],
+    ) -> tuple[str, list[SourceChunk]]:
         """格式化答案中的引用。
 
         解析 [N] 标记，验证有效性，生成 SourceChunk 列表。
@@ -75,7 +74,7 @@ class CitationFormatter:
         cited_indices = self._extract_cited_indices(raw_answer)
 
         # 为每个被引用的编号创建 SourceChunk
-        sources: List[SourceChunk] = []
+        sources: list[SourceChunk] = []
         for idx in cited_indices:
             # 编号从 1 开始，列表索引从 0 开始
             result_idx = idx - 1
@@ -99,8 +98,8 @@ class CitationFormatter:
     def format_with_remap(
         self,
         raw_answer: str,
-        search_results: List[SearchResult],
-    ) -> Tuple[str, List[SourceChunk]]:
+        search_results: list[SearchResult],
+    ) -> tuple[str, list[SourceChunk]]:
         """格式化并重新映射引用编号。
 
         当答案中的引用编号与最终展示顺序不一致时使用。
@@ -119,8 +118,8 @@ class CitationFormatter:
             return raw_answer, []
 
         # 构建旧编号 → 新编号的映射
-        remap: Dict[int, int] = {}
-        new_sources: List[SourceChunk] = []
+        remap: dict[int, int] = {}
+        new_sources: list[SourceChunk] = []
         new_idx = 1
 
         for old_idx in cited_indices:
@@ -146,7 +145,7 @@ class CitationFormatter:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _extract_cited_indices(text: str) -> List[int]:
+    def _extract_cited_indices(text: str) -> list[int]:
         """从答案中提取所有被引用的编号。
 
         Args:
@@ -185,7 +184,7 @@ class CitationFormatter:
         )
 
     @staticmethod
-    def _format_location(metadata: Dict) -> str:
+    def _format_location(metadata: dict) -> str:
         """根据文档格式生成人类可读的位置描述。
 
         适配 8 种格式（见 spec §7.3）。
@@ -197,7 +196,7 @@ class CitationFormatter:
             位置描述字符串。
         """
         fmt = metadata.get("format", "").lower()
-        parts: List[str] = []
+        parts: list[str] = []
 
         if fmt == "pdf":
             page = metadata.get("page_number")

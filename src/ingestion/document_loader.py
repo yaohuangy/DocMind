@@ -10,7 +10,6 @@
 import logging
 import os
 from enum import Enum
-from typing import Dict, List, Optional
 
 from llama_index.core.schema import Document as LlamaDocument
 
@@ -33,7 +32,7 @@ class DocFormat(Enum):
 
 
 # 扩展名 → DocFormat 映射
-_EXTENSION_MAP: Dict[str, DocFormat] = {
+_EXTENSION_MAP: dict[str, DocFormat] = {
     ".pdf": DocFormat.PDF,
     ".docx": DocFormat.DOCX,
     ".md": DocFormat.MARKDOWN,
@@ -61,17 +60,17 @@ class MultiFormatLoader:
 
     def __init__(self) -> None:
         """初始化分发器，注册所有 8 个格式解析器。"""
-        self._parsers: Dict[DocFormat, BaseParser] = {}
+        self._parsers: dict[DocFormat, BaseParser] = {}
 
         # 延迟导入各 parser，避免一次性加载所有依赖
-        from src.ingestion.parsers.pdf_parser import PDFParser
-        from src.ingestion.parsers.web_parser import WebParser
-        from src.ingestion.parsers.docx_parser import DocxParser
-        from src.ingestion.parsers.markdown_parser import MarkdownParser
-        from src.ingestion.parsers.text_parser import TextParser
-        from src.ingestion.parsers.pptx_parser import PptxParser
         from src.ingestion.parsers.csv_parser import CSVParser
+        from src.ingestion.parsers.docx_parser import DocxParser
         from src.ingestion.parsers.excel_parser import ExcelParser
+        from src.ingestion.parsers.markdown_parser import MarkdownParser
+        from src.ingestion.parsers.pdf_parser import PDFParser
+        from src.ingestion.parsers.pptx_parser import PptxParser
+        from src.ingestion.parsers.text_parser import TextParser
+        from src.ingestion.parsers.web_parser import WebParser
 
         self.register_parser(DocFormat.PDF, PDFParser())
         self.register_parser(DocFormat.WEB, WebParser())
@@ -103,7 +102,7 @@ class MultiFormatLoader:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def detect_format(source: str) -> Optional[DocFormat]:
+    def detect_format(source: str) -> DocFormat | None:
         """自动检测文档格式。
 
         规则：
@@ -145,7 +144,7 @@ class MultiFormatLoader:
     # 加载入口
     # ------------------------------------------------------------------
 
-    def load(self, source: str) -> List[LlamaDocument]:
+    def load(self, source: str) -> list[LlamaDocument]:
         """统一加载入口——根据 source 自动选择 Parser。
 
         Args:
@@ -179,7 +178,7 @@ class MultiFormatLoader:
             logger.error("文档加载失败 [%s] %s: %s", fmt.value, source, e)
             return []
 
-    def load_batch(self, sources: List[str]) -> List[LlamaDocument]:
+    def load_batch(self, sources: list[str]) -> list[LlamaDocument]:
         """批量加载多个文档。
 
         每个 source 独立解析，一个失败不影响其他。
@@ -191,7 +190,7 @@ class MultiFormatLoader:
         Returns:
             所有文档的 LlamaDocument 列表（平铺）。
         """
-        all_docs: List[LlamaDocument] = []
+        all_docs: list[LlamaDocument] = []
         for source in sources:
             try:
                 docs = self.load(source)
@@ -210,7 +209,7 @@ class MultiFormatLoader:
     # ------------------------------------------------------------------
 
     @property
-    def supported_formats(self) -> List[str]:
+    def supported_formats(self) -> list[str]:
         """返回所有支持的格式标识列表。"""
         return [fmt.value for fmt in self._parsers.keys()]
 

@@ -5,10 +5,9 @@
 """
 
 import math
-from typing import Dict, List, Set, Tuple
 
 
-def recall_at_k(retrieved_ids: List[str], relevant_ids: Set[str], k: int) -> float:
+def recall_at_k(retrieved_ids: list[str], relevant_ids: set[str], k: int) -> float:
     """计算 Recall@k。
 
     Recall@k = |retrieved[:k] ∩ relevant| / |relevant|
@@ -29,7 +28,7 @@ def recall_at_k(retrieved_ids: List[str], relevant_ids: Set[str], k: int) -> flo
     return hits / len(relevant_ids)
 
 
-def precision_at_k(retrieved_ids: List[str], relevant_ids: Set[str], k: int) -> float:
+def precision_at_k(retrieved_ids: list[str], relevant_ids: set[str], k: int) -> float:
     """计算 Precision@k。
 
     Precision@k = |retrieved[:k] ∩ relevant| / k
@@ -50,7 +49,7 @@ def precision_at_k(retrieved_ids: List[str], relevant_ids: Set[str], k: int) -> 
     return hits / k
 
 
-def mrr(retrieved_ids: List[str], relevant_ids: Set[str]) -> float:
+def mrr(retrieved_ids: list[str], relevant_ids: set[str]) -> float:
     """计算 Mean Reciprocal Rank。
 
     MRR = 1 / rank_of_first_relevant
@@ -73,7 +72,7 @@ def mrr(retrieved_ids: List[str], relevant_ids: Set[str]) -> float:
     return 0.0
 
 
-def ndcg_at_k(retrieved_ids: List[str], relevant_ids: Set[str], k: int) -> float:
+def ndcg_at_k(retrieved_ids: list[str], relevant_ids: set[str], k: int) -> float:
     """计算 NDCG@k（Normalized Discounted Cumulative Gain）。
 
     使用二元相关性（在 relevant_ids 中为 1，否则为 0）。
@@ -112,10 +111,10 @@ def ndcg_at_k(retrieved_ids: List[str], relevant_ids: Set[str], k: int) -> float
 
 
 def compute_all_metrics(
-    retrieved_ids: List[str],
-    relevant_ids: Set[str],
-    k_values: Tuple[int, ...] = (5, 10),
-) -> Dict[str, float]:
+    retrieved_ids: list[str],
+    relevant_ids: set[str],
+    k_values: tuple[int, ...] = (5, 10),
+) -> dict[str, float]:
     """计算全套评测指标。
 
     Args:
@@ -127,7 +126,7 @@ def compute_all_metrics(
         指标字典，键如 "recall@5", "recall@10", "precision@5",
         "precision@10", "mrr", "ndcg@5", "ndcg@10"。
     """
-    metrics: Dict[str, float] = {}
+    metrics: dict[str, float] = {}
 
     for k in k_values:
         metrics[f"recall@{k}"] = recall_at_k(retrieved_ids, relevant_ids, k)
@@ -139,7 +138,7 @@ def compute_all_metrics(
     return metrics
 
 
-def percentile(values: List[float], p: float) -> float:
+def percentile(values: list[float], p: float) -> float:
     """计算分位数（线性插值）。
 
     Args:

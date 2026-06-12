@@ -5,7 +5,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -25,7 +25,7 @@ class SourceChunk:
     doc_name: str
     text: str
     score: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     location_text: str = ""
 
     @property
@@ -38,7 +38,7 @@ class SourceChunk:
         """所属文档 ID。"""
         return self.metadata.get("doc_id", "")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转为可序列化字典（供 Streamlit st.session_state 存储）。"""
         return {
             "chunk_id": self.chunk_id,
@@ -52,7 +52,7 @@ class SourceChunk:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "SourceChunk":
+    def from_dict(cls, d: dict[str, Any]) -> "SourceChunk":
         """从字典恢复。"""
         return cls(
             chunk_id=d.get("chunk_id", ""),
@@ -78,16 +78,16 @@ class AnswerResult:
 
     question: str
     answer: str
-    sources: List[SourceChunk] = field(default_factory=list)
+    sources: list[SourceChunk] = field(default_factory=list)
     method: str = ""
-    concepts_extracted: List[str] = field(default_factory=list)
+    concepts_extracted: list[str] = field(default_factory=list)
 
     @property
     def source_count(self) -> int:
         """引用来源数。"""
         return len(self.sources)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转为可序列化字典。"""
         return {
             "question": self.question,
@@ -122,7 +122,7 @@ class IngestResult:
     char_count: int = 0
     loaded_at: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "doc_id": self.doc_id,
             "doc_name": self.doc_name,

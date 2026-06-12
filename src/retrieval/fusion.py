@@ -7,7 +7,6 @@
 """
 
 import logging
-from typing import Dict, List, Optional
 
 from src.core.vector_store import SearchResult
 
@@ -19,10 +18,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def reciprocal_rank_fusion(
-    result_lists: List[List[SearchResult]],
+    result_lists: list[list[SearchResult]],
     k: int = 60,
     top_k: int = 10,
-) -> List[SearchResult]:
+) -> list[SearchResult]:
     """Reciprocal Rank Fusion 算法。
 
     将多路排序结果列表融合为一个排序列表，不依赖各路的绝对分数。
@@ -43,9 +42,9 @@ def reciprocal_rank_fusion(
         return []
 
     # chunk_id → (累积 RRF 分数, 最优 text, 最优 metadata)
-    rrf_scores: Dict[str, float] = {}
-    best_text: Dict[str, str] = {}
-    best_metadata: Dict[str, dict] = {}
+    rrf_scores: dict[str, float] = {}
+    best_text: dict[str, str] = {}
+    best_metadata: dict[str, dict] = {}
 
     for result_list in result_lists:
         for rank, result in enumerate(result_list):
@@ -62,7 +61,7 @@ def reciprocal_rank_fusion(
     # 按 RRF 分数降序排列
     sorted_ids = sorted(rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True)
 
-    fused: List[SearchResult] = []
+    fused: list[SearchResult] = []
     for cid in sorted_ids[:top_k]:
         fused.append(SearchResult(
             chunk_id=cid,
@@ -80,13 +79,13 @@ def reciprocal_rank_fusion(
 # ---------------------------------------------------------------------------
 
 def weighted_merge(
-    results_a: List[SearchResult],
-    results_b: List[SearchResult],
+    results_a: list[SearchResult],
+    results_b: list[SearchResult],
     weight_a: float = 0.4,
     weight_b: float = 0.6,
     top_k: int = 10,
     normalize: bool = True,
-) -> List[SearchResult]:
+) -> list[SearchResult]:
     """两组检索结果加权合并。
 
     对每组结果做 Min-Max 归一化后，按权重计算最终分数：
@@ -120,7 +119,7 @@ def weighted_merge(
 
     # 加权合并
     all_ids = set(scores_a.keys()) | set(scores_b.keys())
-    merged_scores: Dict[str, float] = {}
+    merged_scores: dict[str, float] = {}
 
     for cid in all_ids:
         sa = scores_a.get(cid, 0.0)
@@ -131,8 +130,8 @@ def weighted_merge(
     sorted_ids = sorted(merged_scores.keys(), key=lambda cid: merged_scores[cid], reverse=True)
 
     # 保留最佳 text/metadata（优先 scores_a 或分数高的那个）
-    best_text: Dict[str, str] = {}
-    best_metadata: Dict[str, dict] = {}
+    best_text: dict[str, str] = {}
+    best_metadata: dict[str, dict] = {}
 
     # 收集所有结果用于回溯 text/metadata
     for r in results_a + results_b:
@@ -140,7 +139,7 @@ def weighted_merge(
             best_text[r.chunk_id] = r.text
             best_metadata[r.chunk_id] = r.metadata
 
-    merged: List[SearchResult] = []
+    merged: list[SearchResult] = []
     for cid in sorted_ids[:top_k]:
         merged.append(SearchResult(
             chunk_id=cid,
@@ -161,9 +160,9 @@ def weighted_merge(
 # ---------------------------------------------------------------------------
 
 def deduplicate(
-    results: List[SearchResult],
+    results: list[SearchResult],
     key_fn=None,
-) -> List[SearchResult]:
+) -> list[SearchResult]:
     """按 chunk_id 去重，保留分数最高的那个。
 
     Args:
@@ -176,7 +175,7 @@ def deduplicate(
     if key_fn is None:
         key_fn = lambda r: r.chunk_id
 
-    seen: Dict[str, SearchResult] = {}
+    seen: dict[str, SearchResult] = {}
     for r in results:
         k = key_fn(r)
         if k not in seen or r.score > seen[k].score:
@@ -190,12 +189,12 @@ def deduplicate(
 # 内部辅助
 # ---------------------------------------------------------------------------
 
-def _to_score_map(results: List[SearchResult]) -> Dict[str, float]:
+def _to_score_map(results: list[SearchResult]) -> dict[str, float]:
     """将 SearchResult 列表转为 chunk_id → score 映射。"""
     return {r.chunk_id: r.score for r in results}
 
 
-def _minmax_normalize(scores: Dict[str, float]) -> Dict[str, float]:
+def _minmax_normalize(scores: dict[str, float]) -> dict[str, float]:
     """Min-Max 归一化：将所有分数映射到 [0, 1] 区间。
 
     Args:

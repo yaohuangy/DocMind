@@ -17,7 +17,6 @@ MQE + HyDE 组合检索器。
 
 import asyncio
 import logging
-from typing import List, Optional
 
 from src.core.config import RetrievalConfig, get_config
 from src.core.embedder import BaseEmbedder, create_embedder
@@ -25,8 +24,8 @@ from src.core.llm_client import LLMClient
 from src.core.vector_store import SearchResult, VectorStore
 from src.retrieval.base_retriever import BaseRetriever
 from src.retrieval.fusion import weighted_merge
-from src.retrieval.mqe_retriever import MQERetriever
 from src.retrieval.hyde_retriever import HyDERetriever
+from src.retrieval.mqe_retriever import MQERetriever
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +44,11 @@ class CombinedRetriever(BaseRetriever):
 
     def __init__(
         self,
-        llm_client: Optional[LLMClient] = None,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
-        config: Optional[RetrievalConfig] = None,
-        where_filter: Optional[dict] = None,
+        llm_client: LLMClient | None = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
+        config: RetrievalConfig | None = None,
+        where_filter: dict | None = None,
     ) -> None:
         """
         Args:
@@ -92,7 +91,7 @@ class CombinedRetriever(BaseRetriever):
         self,
         question: str,
         top_k: int = 10,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """MQE + HyDE 组合检索——两个分支并行执行。
 
         Args:

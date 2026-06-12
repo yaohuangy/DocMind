@@ -11,18 +11,17 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from src.core.embedder import BaseEmbedder, create_embedder
+from src.core.embedder import BaseEmbedder
 from src.core.graph_store import GraphStore
 from src.core.llm_client import LLMClient
 from src.core.vector_store import VectorStore
-from src.engine.models import AnswerResult, SourceChunk
+from src.engine.models import SourceChunk
 from src.memory.episodic_memory import EpisodicMemory
 from src.memory.models import (
     ConceptNode,
     EpisodicMemoryRecord,
-    WorkingMemoryEntry,
 )
 from src.memory.semantic_memory import SemanticMemory
 from src.memory.working_memory import WorkingMemory
@@ -57,13 +56,13 @@ class MemoryManager:
     def __init__(
         self,
         session_id: str = "default",
-        working_memory: Optional[WorkingMemory] = None,
-        episodic_memory: Optional[EpisodicMemory] = None,
-        semantic_memory: Optional[SemanticMemory] = None,
-        llm_client: Optional[LLMClient] = None,
-        embedder: Optional[BaseEmbedder] = None,
-        vector_store: Optional[VectorStore] = None,
-        graph_store: Optional[GraphStore] = None,
+        working_memory: WorkingMemory | None = None,
+        episodic_memory: EpisodicMemory | None = None,
+        semantic_memory: SemanticMemory | None = None,
+        llm_client: LLMClient | None = None,
+        embedder: BaseEmbedder | None = None,
+        vector_store: VectorStore | None = None,
+        graph_store: GraphStore | None = None,
     ) -> None:
         """
         Args:
@@ -106,8 +105,8 @@ class MemoryManager:
         self,
         question: str,
         answer: str,
-        sources: Optional[List[SourceChunk]] = None,
-        concepts: Optional[List[str]] = None,
+        sources: list[SourceChunk] | None = None,
+        concepts: list[str] | None = None,
         auto_extract_concepts: bool = True,
     ) -> None:
         """记录一次完整的问答交互到三记忆系统。
@@ -226,7 +225,7 @@ class MemoryManager:
         """
         return self.working.get_context(last_n=last_n)
 
-    def get_active_concepts(self) -> List[str]:
+    def get_active_concepts(self) -> list[str]:
         """获取当前会话中的活跃概念列表。
 
         Returns:
@@ -243,7 +242,7 @@ class MemoryManager:
         keyword: str,
         episodic_limit: int = 10,
         semantic_limit: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """跨记忆搜索——同时搜索情景记忆和语义记忆。
 
         Args:
@@ -259,14 +258,14 @@ class MemoryManager:
             }
         """
         # 情景记忆搜索
-        episodic_results: List[EpisodicMemoryRecord] = []
+        episodic_results: list[EpisodicMemoryRecord] = []
         try:
             episodic_results = self.episodic.search(keyword, limit=episodic_limit, user_id=self._user_id)
         except Exception as e:
             logger.error("情景记忆搜索失败: %s", e)
 
         # 语义记忆搜索
-        semantic_results: List[ConceptNode] = []
+        semantic_results: list[ConceptNode] = []
         try:
             semantic_results = self.semantic.search_concepts(keyword, limit=semantic_limit, user_id=self._user_id)
         except Exception as e:
@@ -289,7 +288,7 @@ class MemoryManager:
     # 回顾数据
     # ==================================================================
 
-    def get_review_data(self) -> Dict[str, Any]:
+    def get_review_data(self) -> dict[str, Any]:
         """获取学习回顾所需的聚合数据。
 
         Returns:
@@ -302,14 +301,14 @@ class MemoryManager:
         """
         episodic_count = self.episodic.get_record_count()
 
-        recent_episodes: List[EpisodicMemoryRecord] = []
+        recent_episodes: list[EpisodicMemoryRecord] = []
         try:
             recent_episodes = self.episodic.search_by_time(limit=20, user_id=self._user_id)
         except Exception as e:
             logger.error("获取情景记忆失败: %s", e)
 
         concept_count = 0
-        top_concepts: List[ConceptNode] = []
+        top_concepts: list[ConceptNode] = []
         try:
             top_concepts = self.semantic.get_all_concepts(limit=20, user_id=self._user_id)
             concept_count = self.semantic.get_concept_count(user_id=self._user_id)
@@ -334,7 +333,7 @@ class MemoryManager:
     def add_note(
         self,
         content: str,
-        related_concepts: Optional[List[str]] = None,
+        related_concepts: list[str] | None = None,
     ) -> str:
         """添加一条学习笔记。
 
@@ -377,7 +376,7 @@ class MemoryManager:
     # 内部辅助
     # ==================================================================
 
-    def _extract_concepts(self, question: str, answer: str) -> List[str]:
+    def _extract_concepts(self, question: str, answer: str) -> list[str]:
         """使用 LLM 从问答中提取概念名称。
 
         Args:
@@ -478,7 +477,7 @@ class MemoryManager:
     # 笔记列表与删除
     # ==================================================================
 
-    def list_notes(self, limit: int = 50) -> List[EpisodicMemoryRecord]:
+    def list_notes(self, limit: int = 50) -> list[EpisodicMemoryRecord]:
         """列出所有笔记（按时间降序）。
 
         Args:
@@ -569,7 +568,7 @@ class MemoryManager:
         ]
 
         # 构建近期活动
-        recent: List[Dict] = []
+        recent: list[dict] = []
         for ep in review.get("recent_episodes", []):
             recent.append({
                 "question": ep.question[:120] if hasattr(ep, 'question') else "",
