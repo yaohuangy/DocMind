@@ -65,6 +65,7 @@ data/*.db-shm
 data/*.db-wal
 data/*.db-journal
 data/evaluation/
+data/models/
 !data/.gitkeep
 
 # ============================================================================

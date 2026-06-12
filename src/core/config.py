@@ -77,13 +77,80 @@ class RetrievalConfig:
     hyde_weight: float = 0.6  # HyDE 结果在融合中的权重（direct 权重=0.4）
     rrf_k: int = 60  # RRF 平滑常数
 
+    # 重排序（Cross-Encoder 精排）
+    use_reranker: bool = False     # 启用 BAAI/bge-reranker-v2-m3 重排序
+    reranker_top_k: int = 20       # 粗筛取 top-N 后再精排
+
 
 @dataclass
 class ChunkConfig:
-    """分块参数配置。"""
+    """分块参数配置。
+
+    支持按文档格式自适应分块：``chunk_presets`` 字典为每种格式指定
+    独立的 (chunk_size, chunk_overlap)。未配置的格式回退到全局默认值。
+    Markdown 文档按 ## / ### 标题切分，此处的 preset 仅用于超大段落的
+    token 分块回退。
+
+    Usage::
+
+        config = ChunkConfig()
+        size, overlap = config.get_chunk_params("pdf")   # → (1024, 256)
+        size, overlap = config.get_chunk_params("unknown") # → (1024, 128)
+    """
 
     chunk_size: int = 1024
     chunk_overlap: int = 128
+
+    # 按文档格式的自适应分块预设 → {格式: (chunk_size, chunk_overlap)}
+    chunk_presets: dict[str, tuple[int, int]] = field(default_factory=lambda: {
+        "pdf": (1024, 256),    # 技术文档/论文，大分块保证概念完整
+        "pptx": (768, 192),    # PPT 幻灯片，单页内容稀疏
+        "web": (768, 192),     # 网页正文，噪声过滤后中等密度
+        "docx": (768, 192),    # Word 文档
+        "md": (768, 192),      # Markdown（超大段落回退用）
+        "txt": (768, 192),     # 纯文本
+        "csv": (384, 64),      # 表格数据，每行独立
+        "xlsx": (384, 64),     # 电子表格
+    })
+
+    # ------------------------------------------------------------------
+    # 语义分块（SemanticSplitterNodeParser）
+    # ------------------------------------------------------------------
+    use_semantic_chunking: bool = False
+    """启用语义分块：按句子嵌入相似度在话题边界切分。
+    启用后非 md 文档优先使用 SemanticSplitterNodeParser，
+    token 分块（SentenceSplitter）仅作为超大块的兜底。
+    需要 llama-index-embeddings-openai 包。"""
+
+    semantic_buffer_size: int = 1
+    """语义比较的上下文窗口（相邻句子数）。
+    1 = 逐句比较；2-5 = 平滑短离题但粗糙边界。"""
+
+    semantic_breakpoint_percentile: int = 95
+    """断点分位数阈值（百分位）。越小切分越激进、块越多。
+    95 = 仅最不相似的 5% 句子对触发切分。"""
+
+    semantic_max_chunk_multiplier: float = 2.0
+    """语义块最大 token 倍数（相对于 chunk_size）。
+    超过此倍数的语义块回退到 SentenceSplitter token 分块。
+    例如 chunk_size=512 × 2.0 = 最大 1024 token 的语义块。"""
+
+    min_chunk_tokens: int = 50
+    """最小分块 token 数。低于此阈值的碎片合并到前一块。"""
+
+    def get_chunk_params(self, doc_format: str) -> tuple[int, int]:
+        """获取指定文档格式的分块参数。
+
+        Args:
+            doc_format: 文档格式标识（如 pdf / web / docx）。
+
+        Returns:
+            (chunk_size, chunk_overlap) 元组。
+        """
+        preset = self.chunk_presets.get(doc_format)
+        if preset is not None:
+            return preset
+        return (self.chunk_size, self.chunk_overlap)
 
 
 @dataclass
@@ -185,10 +252,21 @@ def load_config() -> Settings:
             mqe_num_variants=_env_int("MQE_NUM_VARIANTS", 4),
             hyde_weight=_env_float("HYDE_WEIGHT", 0.6),
             rrf_k=_env_int("RRF_K", 60),
+            use_reranker=_env_bool("USE_RERANKER", False),
+            reranker_top_k=_env_int("RERANKER_TOP_K", 20),
         ),
         chunk=ChunkConfig(
             chunk_size=_env_int("CHUNK_SIZE", 1024),
             chunk_overlap=_env_int("CHUNK_OVERLAP", 128),
+            use_semantic_chunking=_env_bool("CHUNK_SEMANTIC", False),
+            semantic_buffer_size=_env_int("CHUNK_SEMANTIC_BUFFER_SIZE", 1),
+            semantic_breakpoint_percentile=_env_int(
+                "CHUNK_SEMANTIC_BREAKPOINT_PERCENTILE", 95
+            ),
+            semantic_max_chunk_multiplier=_env_float(
+                "CHUNK_SEMANTIC_MAX_MULTIPLIER", 2.0
+            ),
+            min_chunk_tokens=_env_int("CHUNK_MIN_TOKENS", 50),
         ),
         app_name=_env("APP_NAME", "Docmind"),
         app_port=_env_int("APP_PORT", 7860),

@@ -11,12 +11,49 @@ import logging
 from datetime import datetime
 
 from src.core.chunker import TextChunker
+from src.core.config import ChunkConfig, get_config
 from src.core.embedder import BaseEmbedder, create_embedder
 from src.core.metadata_store import MetadataStore
 from src.core.vector_store import VectorStore
 from src.ingestion.document_loader import MultiFormatLoader
 
 logger = logging.getLogger(__name__)
+
+
+def _create_li_embed_model():
+    """创建 LlamaIndex 兼容的 BaseEmbedding（从 Docmind 配置）。
+
+    用于 SemanticSplitterNodeParser 的语义分块。
+    通过 llama-index-embeddings-openai 的 OpenAIEmbedding 封装
+    DashScope（或其他 OpenAI 兼容 API）。
+
+    Returns:
+        OpenAIEmbedding 实例，导入失败或创建异常时返回 None。
+    """
+    try:
+        from llama_index.embeddings.openai import OpenAIEmbedding  # noqa: F811
+    except ImportError:
+        logger.warning(
+            "llama-index-embeddings-openai 未安装，语义分块不可用。"
+            "安装：pip install llama-index-embeddings-openai"
+        )
+        return None
+
+    cfg = get_config().embedding
+    api_key = cfg.api_key or get_config().llm.api_key
+
+    try:
+        # model_name= 绕过 LlamaIndex 的 OpenAIEmbeddingModelType 枚举校验，
+        # 允许 DashScope 等第三方兼容 API 的自定义模型名（如 text-embedding-v4）
+        return OpenAIEmbedding(
+            model_name=cfg.model,
+            api_key=api_key,
+            api_base=cfg.base_url.rstrip("/") if cfg.base_url else None,
+            embed_batch_size=cfg.batch_size,
+        )
+    except Exception as e:
+        logger.warning("创建 LlamaIndex OpenAIEmbedding 失败: %s", e)
+        return None
 
 
 class IngestPipeline:
@@ -58,7 +95,17 @@ class IngestPipeline:
             metadata_store: 元数据存储（SQLite）。
         """
         self._loader = loader or MultiFormatLoader()
-        self._chunker = chunker or TextChunker()
+
+        # 语义分块用的 LlamaIndex 嵌入模型（与检索嵌入共用同一 API）
+        self._li_embed_model = _create_li_embed_model()
+
+        if chunker:
+            self._chunker = chunker
+        else:
+            self._chunker = TextChunker(
+                embed_model=self._li_embed_model,
+            )
+
         self._embedder = embedder or create_embedder()
         self._vector_store = vector_store or VectorStore()
         self._metadata_store = metadata_store or MetadataStore()
@@ -111,12 +158,32 @@ class IngestPipeline:
             VectorStore.DOCUMENT_CHUNKS, doc_id
         )
 
-        # ---- 2. 分块 ----
-        chunks = self._chunker.split(documents)
+        # ---- 2. 分块（按文档格式自适应参数） ----
+        chunk_size, chunk_overlap = get_config().chunk.get_chunk_params(doc_format)
+        global_chunk = get_config().chunk
+        fmt_chunk_config = ChunkConfig(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            use_semantic_chunking=global_chunk.use_semantic_chunking,
+            semantic_buffer_size=global_chunk.semantic_buffer_size,
+            semantic_breakpoint_percentile=global_chunk.semantic_breakpoint_percentile,
+            semantic_max_chunk_multiplier=global_chunk.semantic_max_chunk_multiplier,
+            min_chunk_tokens=global_chunk.min_chunk_tokens,
+        )
+        fmt_chunker = TextChunker(
+            config=fmt_chunk_config,
+            embed_model=self._li_embed_model,
+        )
+        chunks = fmt_chunker.split(documents)
         if not chunks:
             raise RuntimeError(f"文档分块后无内容: {source}")
 
-        logger.info("步骤2/4 分块完成: %d → %d chunks", len(documents), len(chunks))
+        logger.info(
+            "步骤2/4 分块完成: %d → %d chunks "
+            "(fmt=%s, size=%d, overlap=%d, semantic=%s)",
+            len(documents), len(chunks), doc_format,
+            chunk_size, chunk_overlap, global_chunk.use_semantic_chunking,
+        )
 
         # ---- 3. 嵌入 ----
         chunk_texts = [c.text for c in chunks]

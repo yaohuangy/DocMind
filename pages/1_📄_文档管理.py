@@ -4,8 +4,8 @@
 支持：
 - 多文件上传（PDF, Word, Markdown, TXT, PPT, CSV, Excel）
 - 网页 URL 抓取
-- 分块参数配置
 - 文档列表、筛选、删除
+- 分块参数由 .env 统一配置
 """
 
 import streamlit as st
@@ -41,6 +41,7 @@ tab_upload, tab_url = st.tabs(["📁 文件上传", "🌐 网页抓取"])
 
 with tab_upload:
     st.caption("支持格式: PDF, Word (.docx), Markdown (.md), TXT, PPT (.pptx), CSV, Excel (.xlsx)")
+    st.caption("⚙️ 分块参数（如分块大小、重叠数）由管理员在 `.env` 文件中统一配置，加载时自动应用。")
 
     uploaded_files = st.file_uploader(
         "选择文档文件",
@@ -49,21 +50,6 @@ with tab_upload:
         key="doc_uploader",
         help="可一次选择多个文件。上传后会自动暂存并等待加载。",
     )
-
-    # 分块参数
-    col1, col2 = st.columns(2)
-    with col1:
-        chunk_size = st.number_input(
-            "分块大小 (tokens)",
-            min_value=128, max_value=4096, value=1024, step=128,
-            help="每个分块的最大 token 数。越大上下文越完整，但检索精度可能下降。",
-        )
-    with col2:
-        chunk_overlap = st.number_input(
-            "分块重叠 (tokens)",
-            min_value=0, max_value=1024, value=128, step=32,
-            help="相邻分块之间的重叠 token 数。增加重叠可减少信息断裂。",
-        )
 
     if st.button("🚀 开始加载文件", type="primary", use_container_width=True):
         if not uploaded_files:

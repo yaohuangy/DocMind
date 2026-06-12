@@ -119,11 +119,22 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 | 📝 Ground Truth 生成 | 采样分块 → LLM 生成问题 → 二次改写制造语义鸿沟 → 扩展相邻分块 |
 | 📊 评测指标 | Recall@5/10、Precision@5/10、MRR、NDCG@10、P50/P95 延迟 |
 | 📋 CLI 报告 | 4 方法对比表格 + JSON 输出 |
+| 📜 完整记录 | 详见 [`CHANGELOG.md`](CHANGELOG.md)（更新日志）和 [`eval_data.md`](eval_data.md)（8 轮评测报告） |
+
+### 📈 关键改进数据（15 题 × 语义分块 × Direct 检索）
+
+| 改进项 | 改进前 | 改进后 | 提升 |
+|--------|:-----:|:-----:|:----:|
+| **语义分块**（Token 1024→Semantic 512） | R@10 35.6% / MRR 0.42 | R@10 55.6% / MRR 0.58 | +20pp / +0.16 |
+| **重排序**（+ BGE Reranker v2-m3） | R@5 35.6% / MRR 0.58 | R@5 48.9% / MRR **0.75** | +13pp / +0.17 |
+| **累计**（原始→当前最优） | MRR 0.42 | MRR **0.75** | **+79%** |
+
+> 重排序是投入产出比最高的单项改进——不改分块、不换嵌入模型、零 LLM Token，仅后置精排就带来 MRR +29%。Direct + Reranker 是目前性价比最高的生产配置。
 
 ### 系统特性
 | 特性 | 说明 |
 |------|------|
-| 🆓 免费模型 | 默认阿里 DashScope（qwen-max），注册即送免费额度 |
+| 🆓 免费模型 | 默认阿里 DashScope（qwen-turbo），支持本地 Embedding 模型 |
 | 🎛️ 灵活配置 | 可视化设置页——LLM/Embedding/检索参数，改完即时生效 |
 | 🛡️ 优雅降级 | Neo4j 不可用 → 语义记忆自动禁用，问答笔记不影响 |
 | 🐍 纯 Python | 0 行 HTML/CSS/JS，Streamlit 原生组件 |
@@ -140,7 +151,7 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 | 图数据库 | **Neo4j**（语义记忆知识图谱） |
 | 元数据存储 | **SQLite**（文档列表、反馈记录、会话统计、对话持久化） |
 | LLM SDK | **OpenAI Python SDK**（兼容 OpenAI / DeepSeek / 智谱 / DashScope / Ollama 等） |
-| 嵌入模型 | API 模式（text-embedding-v4）+ 本地模式（sentence-transformers） |
+| 嵌入模型 | API 模式（text-embedding-v4/v3）+ 本地模式（BAAI/bge-small-zh-v1.5） |
 | Python | 3.10+（完整类型注解） |
 
 ---
@@ -367,8 +378,14 @@ DocMind/
 │   ├── chroma/                      # ChromaDB 持久化
 │   ├── evaluation/                  # 评测结果输出
 │   └── metadata.db                  # SQLite
+├── .github/workflows/ci.yml         # GitHub Actions CI/CD
+├── Dockerfile                       # Docker 镜像构建
+├── docker-compose.yml               # 多服务编排
+├── .dockerignore
+├── pyproject.toml                   # Ruff + mypy + pytest 配置
+├── requirements.txt                 # 运行时依赖
+├── requirements-dev.txt             # 开发与 CI 依赖
 ├── .env.example
-├── requirements.txt
 ├── CHANGELOG.md
 └── README.md
 ```
@@ -396,12 +413,17 @@ DocMind/
 # 生成评测集（从已入库文档采样 + LLM 生成问题）
 python scripts/generate_eval_dataset.py --num 30 --rewrite --expand-gt
 
-# 跑 4 方法 Benchmark
-python scripts/run_evaluation.py --dataset data/evaluation/dataset_xxx.json
+# 跑检索 Benchmark
+python scripts/run_evaluation.py --dataset data/evaluation/dataset_xxx.json -u <用户名>
+
+# 跑完整评测（含 Token 成本 + RAGAS 生成质量）
+python scripts/run_evaluation.py --dataset data/evaluation/dataset_xxx.json -u <用户名> --with-generation
 
 # 运行单元测试
 pytest tests/ -v
 ```
+
+> 📊 评测报告含检索指标（Recall/Precision/MRR/NDCG）、延迟分位（P50/P95）、Token 消耗统计，可选 RAGAS 生成质量评分（Faithfulness + Answer Relevancy）。详见 `eval_data.md`。
 
 ## ⚙️ 环境变量参考
 
@@ -411,9 +433,10 @@ pytest tests/ -v
 |------|------|--------|
 | `LLM_API_KEY` | LLM API 密钥（**必填**） | - |
 | `LLM_BASE_URL` | API 基础地址 | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| `LLM_MODEL` | 模型名称 | `qwen-max`（免费额度） |
+| `LLM_MODEL` | 模型名称 | `qwen-turbo` |
 | `EMBEDDING_BACKEND` | `api` 或 `local` | `api` |
-| `EMBEDDING_MODEL` | 嵌入模型 | `text-embedding-v4` |
+| `EMBEDDING_MODEL` | 嵌入模型（API 模式） | `text-embedding-v4` |
+| `EMBEDDING_LOCAL_MODEL` | 嵌入模型（本地模式） | `BAAI/bge-small-zh-v1.5` |
 | `EMBEDDING_BATCH_SIZE` | 嵌入批大小（DashScope 上限 10） | `10` |
 | `NEO4J_URI` | Neo4j 地址 | `bolt://localhost:7687` |
 | `HYDE_WEIGHT` | HyDE 分支权重 | `0.6` |
@@ -426,7 +449,7 @@ pytest tests/ -v
 
 | 平台 | LLM 模型 | 嵌入模型 | 费用 |
 |------|---------|---------|------|
-| **阿里 DashScope** | `qwen-max` | `text-embedding-v4` | 有免费额度 |
+| **阿里 DashScope** | `qwen-turbo` / `qwen3.7-max` | `text-embedding-v4` | 注册即送额度 |
 | **硅基流动** | `Qwen/Qwen2.5-7B-Instruct` | `BAAI/bge-large-zh-v1.5` | 有免费额度 |
 | **DeepSeek** | `deepseek-chat` | - | 低价 |
 | **智谱 AI** | `glm-4-flash` | `embedding-2` | 有免费额度 |
@@ -449,7 +472,7 @@ pytest tests/ -v
 
 ### RAG 效果监控
 - ✅ **在线监控面板**：Grafana/Datadog 风格 Dashboard，KPI 概览 + 各方法满意率/延迟对比图表 + 最近反馈列表。
-- ✅ **离线评测框架**：LLM 自动生成 Ground Truth（含语义改写），4 方法 Benchmark，Recall@K / Precision@K / MRR / NDCG / P50/P95 延迟指标。
+- ✅ **离线评测框架**：LLM 自动生成 Ground Truth（含语义改写），4 方法 Benchmark，Recall@K / Precision@K / MRR / NDCG / P50/P95 延迟、Token 成本统计、RAGAS 生成质量评分。
 
 ### 工程化基础
 - ✅ **优雅降级**：Neo4j 不可用时语义记忆自动禁用，问答、笔记等核心功能不受影响。
@@ -467,8 +490,8 @@ pytest tests/ -v
 
 ### 🚧 RAG 评测体系完善
 - ✅ **检索阶段评测**：Recall@K / Precision@K / MRR / NDCG / P50-P95 延迟（已实现）。
-- 🚧 **生成阶段评测**：引入 RAGAS 等框架，补充忠实度（Faithfulness）、答案正确性等生成质量指标。
-- 🚧 **结果去重与 Token 成本分析**：补全召回片段去重压缩 + Token 消耗看板，形成从检索到生成的完整评测闭环。
+- ✅ **生成阶段评测**：集成 RAGAS 框架，支持 Faithfulness（忠实度）和 Answer Relevancy（答案相关性）生成质量指标（通过 `--with-generation` 启用）。
+- ✅ **Token 成本分析**：评测报告自动统计输入/输出 Token 消耗，按检索方法汇总对比。
 
 ### 🚧 检索质量进阶——结构化文档处理
 - 🚧 **PDF 表格抽取**：使用 PyMuPDF 的表格识别能力，将表格转为 Markdown 格式再分块，大幅提升财务报表、技术规格文档的问答准确率。
@@ -476,7 +499,7 @@ pytest tests/ -v
 
 ### 🚧 检索结果压缩与去冗
 - 🚧 **召回片段去重压缩**：RAG 召回的多片段可能存在重复或冗余信息，送入 LLM 前做一次语义去重 + 关键句压缩，减少 token 消耗，提升生成质量。
-- 🚧 **Token 成本分析看板**：基于 `feedback` 表的延迟数据，扩展按检索方法统计 token 消耗、生成质量和端到端延迟的成本面板。
+- 🚧 **在线 Token 成本看板**：在监控页面中展示实时 Token 消耗和成本估算，与离线评测互补。
 
 ### 🚧 多用户权限与协作
 - 🚧 **文档级共享**：用户可将单篇文档设为「团队成员可见」，ChromaDB 过滤条件扩展为支持 `user_id` 列表。
@@ -484,5 +507,20 @@ pytest tests/ -v
 - 💡 *企业级叙事：支持部门级文档共享与权限控制。*
 
 ### 🚧 代码质量强化
-- 🚧 **静态类型检查**：项目已全面使用类型注解，接入 mypy / pyright 并贴上「通过静态类型检查」徽章。
+- ✅ **静态类型检查**：项目已通过 mypy 严格类型检查（49 个源文件零错误）。
 - 🚧 **单元测试覆盖**：为核心模块（检索策略 RRF 融合、8 个 Parser、分块逻辑、引用格式化）编写测试用例，目标覆盖率 >70%。
+
+### 🚧 多模态输入
+- 🚧 **语音输入（Whisper）**：集成 OpenAI Whisper 或本地 faster-whisper 模型，用户可直接语音提问，前端录音 → 后端转写 → 送入 RAG 管线，全程无需键盘。对移动端和长问题场景体验提升显著。
+- 🚧 **图片输入**：支持用户上传截图、图表、扫描件，通过多模态 LLM（如 GPT-4o、Qwen-VL）直接理解图片内容并融入检索和生成流程。初期可先支持「图片 + 文字」混合提问，后续扩展到纯图片问答。
+- 💡 *叙事：从「文档问答」升级为「多模态知识助手」，语音降低使用门槛，图片覆盖更多真实场景（课堂板书、会议白板、产品截图）。*
+
+### 🚧 动态路由 RAG
+- 🚧 **查询复杂度分类器**：在检索前置一个轻量级路由层，用小型分类模型（或 LLM 单次调用）判断用户问题的复杂度——简单事实查询走 Direct 检索（0.3s 零成本），需要推理的综合问题走 HyDE 或 MQE+HyDE（高精度）。
+- 🚧 **自适应检索深度**：根据路由结果动态调整 top_k 和融合权重，避免「大炮打蚊子」式的过度检索。例如「什么是 XX」直接返回 top-3，「帮我对比 A 和 B 的优劣」扩展到 top-10 并启用多策略融合。
+- 💡 *叙事：智能路由让系统「看菜吃饭」，简单问题秒回省 token，复杂问题深度检索保质量，在成本和精度之间自动平衡。*
+
+### 🚧 Agent 记忆升级
+- 🚧 **对话摘要压缩**：当前工作记忆直接保留最近 N 轮原始对话，长会话 token 消耗线性增长。改为用 LLM 对历史对话做增量摘要——每轮结束后将旧对话压缩为一段结构化摘要（关键问题、已确认事实、用户偏好），大幅降低上下文 token 消耗。
+- 🚧 **独立记忆 Agent**：将记忆的存储/检索/压缩逻辑从 QAEngine 中解耦为独立 MemoryAgent。它拥有自己的 tool set（写入情景记忆、查询语义记忆、生成摘要、提取概念），通过 function calling 自主决定何时记什么、何时压缩、何时检索回忆。主 Agent 只需调用 MemoryAgent 接口，不再关心记忆内部实现。
+- 💡 *叙事：记忆不再是简单的日志，而是一个会「主动整理笔记」的独立 Agent。旧对话自动压缩，关键信息自动归档，长期使用越用越聪明。*

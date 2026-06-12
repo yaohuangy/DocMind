@@ -62,6 +62,9 @@ class QAEngine:
         self._vector_store = VectorStore(config.chroma)
         self._metadata_store = MetadataStore(config.sqlite)
 
+        # ---- 重排序器（懒加载） ----
+        self._reranker = None
+
         # ---- 子模块 ----
         self._ingest_pipeline = IngestPipeline(
             embedder=self._embedder,
@@ -215,18 +218,29 @@ class QAEngine:
 
         retriever = self._get_retriever(method_key)
 
+        # 重排序模式：粗筛取更多，精排后截断
+        fetch_k = top_k
+        if self._config.retrieval.use_reranker:
+            fetch_k = max(self._config.retrieval.reranker_top_k, top_k * 2)
+
         try:
-            search_results = retriever.retrieve(question, top_k=top_k)
+            search_results = retriever.retrieve(question, top_k=fetch_k)
         except Exception as e:
             logger.error("检索失败 [%s]: %s", method_key, e)
             return []
 
+        # 重排序（Cross-Encoder 精排）
+        if self._config.retrieval.use_reranker and len(search_results) > 1:
+            search_results = self._apply_rerank(question, search_results, top_k)
+
         # SearchResult → SourceChunk（含位置描述）
-        sources = self._to_source_chunks(search_results)
+        sources = self._to_source_chunks(search_results[:top_k])
 
         self._question_count += 1
         logger.info(
-            "检索完成 [%s]: \"%s\" → %d sources", method_key, question[:50], len(sources)
+            "检索完成 [%s]: \"%s\" → %d sources (rerank=%s)",
+            method_key, question[:50], len(sources),
+            self._config.retrieval.use_reranker,
         )
         return sources
 
@@ -621,6 +635,37 @@ class QAEngine:
     # ==================================================================
     # 内部方法
     # ==================================================================
+
+    def _apply_rerank(
+        self,
+        question: str,
+        results: list[SearchResult],
+        top_k: int,
+    ) -> list[SearchResult]:
+        """对检索结果用 Cross-Encoder 重排序。
+
+        Args:
+            question: 用户问题。
+            results: 粗筛结果列表。
+            top_k: 返回前 K 个。
+
+        Returns:
+            重排序后的结果列表。
+        """
+        if self._reranker is None:
+            from src.retrieval.reranker import Reranker
+            self._reranker = Reranker()
+
+        docs = [{"text": r.text, "score": r.score, "meta": r} for r in results]
+        reranked = self._reranker.rerank(question, docs, top_k=top_k)
+
+        # 更新原始 SearchResult 的 score 为精排分数
+        out: list[SearchResult] = []
+        for doc in reranked:
+            original: SearchResult = doc["meta"]
+            original.score = doc.get("rerank_score", original.score)
+            out.append(original)
+        return out
 
     @staticmethod
     def _normalize_method(method: str) -> str:

@@ -35,6 +35,11 @@ class PerQuestionResult:
         retrieved_scores: 对应分数。
         total_latency_sec: 总耗时（秒）。
         phase_timings: 各阶段耗时明细。
+        answer_text: LLM 生成的答案（仅 --with-generation 模式下填充）。
+        faithfulness: RAGAS 忠实度评分（0~1）。
+        answer_relevancy: RAGAS 答案相关性评分（0~1）。
+        input_tokens: 输入 prompt token 数。
+        output_tokens: 输出 completion token 数。
     """
 
     question: str
@@ -43,6 +48,11 @@ class PerQuestionResult:
     retrieved_scores: list[float] = field(default_factory=list)
     total_latency_sec: float = 0.0
     phase_timings: dict[str, float] = field(default_factory=dict)
+    answer_text: str = ""
+    faithfulness: float | None = None
+    answer_relevancy: float | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 @dataclass
@@ -72,6 +82,14 @@ class MethodMetrics:
     p50_latency_sec: float = 0.0
     p95_latency_sec: float = 0.0
     num_questions: int = 0
+    # 生成质量（RAGAS）
+    avg_faithfulness: float | None = None
+    avg_answer_relevancy: float | None = None
+    # Token 成本
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    avg_input_tokens: float = 0.0
+    avg_output_tokens: float = 0.0
 
 
 @dataclass

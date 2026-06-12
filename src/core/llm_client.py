@@ -86,6 +86,9 @@ class LLMClient:
             base_url=llm_config.base_url,
         )
 
+        # 最近一次 API 调用的 token 用量
+        self.last_usage: dict[str, int] = {}
+
     # ------------------------------------------------------------------
     # 底层调用
     # ------------------------------------------------------------------
@@ -113,6 +116,13 @@ class LLMClient:
             max_tokens=max_tokens if max_tokens is not None else self._config.max_tokens,
             stream=False,
         )
+        # 捕获 token 用量
+        if response.usage:  # type: ignore[union-attr]
+            self.last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens,  # type: ignore[union-attr]
+                "completion_tokens": response.usage.completion_tokens,  # type: ignore[union-attr]
+                "total_tokens": response.usage.total_tokens,  # type: ignore[union-attr]
+            }
         content = response.choices[0].message.content  # type: ignore[union-attr]
         return content.strip() if content else ""
 

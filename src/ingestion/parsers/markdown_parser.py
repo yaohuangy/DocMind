@@ -93,9 +93,16 @@ class MarkdownParser(BaseParser):
     # 内部：标题分割
     # ------------------------------------------------------------------
 
+    # 用作分块边界的标题级别：## 和 ###
+    _CHUNK_HEADING_LEVELS = {2, 3}
+
     @staticmethod
     def _split_by_headings(text: str) -> list[tuple[str, str]]:
-        """按 Markdown 标题（# ~ ######）分割文本。
+        """按 ## 和 ### 标题分割 Markdown 文本。
+
+        - ``#``（H1）视为文档标题，不触发切分。
+        - ``##`` 和 ``###`` 作为分块边界。
+        - ``####`` 及更深标题保留在父级段落内，不切开。
 
         构建每个段落对应的 heading_path，例如：
         "## 背景 > ### 动机" 表示该段落位于 背景 下的 动机 小节。
@@ -109,7 +116,7 @@ class MarkdownParser(BaseParser):
         lines = text.split("\n")
         heading_pattern = re.compile(r"^(#{1,6})\s+(.+)$")
 
-        # 构建标题层级栈: [(level, title), ...]
+        # 标题路径栈: [(level, title), ...]  —— 始终以最深层级表示当前位置
         heading_stack: list[tuple[int, str]] = []
         sections: list[tuple[str, str]] = []
         current_lines: list[str] = []
@@ -117,21 +124,34 @@ class MarkdownParser(BaseParser):
         for line in lines:
             match = heading_pattern.match(line)
             if match:
-                # 保存前一个段落
-                if current_lines:
-                    path = " > ".join(title for _, title in heading_stack)
-                    sections.append((path, "\n".join(current_lines)))
-                    current_lines = []
-
                 level = len(match.group(1))
                 title = match.group(2).strip()
 
-                # 弹出层级 >= 当前级别的旧标题
-                while heading_stack and heading_stack[-1][0] >= level:
-                    heading_stack.pop()
-                heading_stack.append((level, title))
-            else:
-                current_lines.append(line)
+                if level in MarkdownParser._CHUNK_HEADING_LEVELS:
+                    # ## / ### → 触发切分
+                    if current_lines:
+                        path = " > ".join(title for _, title in heading_stack)
+                        sections.append((path, "\n".join(current_lines)))
+                        current_lines = []
+
+                    # 弹出层级 >= 当前级别的旧标题
+                    while heading_stack and heading_stack[-1][0] >= level:
+                        heading_stack.pop()
+                    heading_stack.append((level, title))
+                else:
+                    # # / ####+ → 不切分，仅更新路径栈
+                    if level == 1:
+                        # H1：清空栈，设为文档级标题
+                        heading_stack.clear()
+                        heading_stack.append((level, title))
+                    else:
+                        # ####+：作为当前段落内的子标题，不切分
+                        while heading_stack and heading_stack[-1][0] >= level:
+                            heading_stack.pop()
+                        heading_stack.append((level, title))
+
+            # 无论是否标题行，都加入当前段落
+            current_lines.append(line)
 
         # 最后一个段落
         if current_lines:

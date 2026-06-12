@@ -114,9 +114,23 @@ class CombinedRetriever(BaseRetriever):
         mqe_task = self._mqe_retriever.retrieve_async(question, top_k=top_k)
         hyde_task = self._hyde_retriever.retrieve_async(question, top_k=top_k)
 
-        mqe_results, hyde_results = await asyncio.gather(
-            mqe_task, hyde_task
-        )
+        try:
+            mqe_results, hyde_results = await asyncio.gather(
+                mqe_task, hyde_task
+            )
+        except Exception:
+            logger.exception("Combined 并行检索失败，回退到分别执行")
+            # 回退：分别执行，一个失败不影响另一个
+            try:
+                mqe_results = await mqe_task
+            except Exception:
+                logger.exception("MQE 分支失败")
+                mqe_results = []
+            try:
+                hyde_results = await hyde_task
+            except Exception:
+                logger.exception("HyDE 分支失败")
+                hyde_results = []
 
         logger.info(
             "Combined 分支完成: MQE=%d 结果, HyDE=%d 结果",

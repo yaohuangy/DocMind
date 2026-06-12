@@ -32,24 +32,42 @@ class InstrumentedLLMClient:
         self.hypothetical_answer_time: float = 0.0
         self.chat_time: float = 0.0
 
+        # 累计 token 用量
+        self.total_prompt_tokens: int = 0
+        self.total_completion_tokens: int = 0
+
     def generate_query_variants(
         self, question: str, num_variants: int = 4
     ) -> list[str]:
         t0 = time.perf_counter()
         result = self._wrapped.generate_query_variants(question, num_variants)
         self.variant_gen_time = time.perf_counter() - t0
+        self._accumulate_tokens()
         return result
 
     def generate_hypothetical_answer(self, question: str) -> str:
         t0 = time.perf_counter()
         result = self._wrapped.generate_hypothetical_answer(question)
         self.hypothetical_answer_time = time.perf_counter() - t0
+        self._accumulate_tokens()
         return result
+
+    def _accumulate_tokens(self) -> None:
+        """从 wrapped 客户端读取最近一次调用的 token 用量并累加。"""
+        usage = self._wrapped.last_usage
+        if usage:
+            self.total_prompt_tokens += usage.get("prompt_tokens", 0)
+            self.total_completion_tokens += usage.get("completion_tokens", 0)
 
     def chat(self, messages, temperature=None, max_tokens=None) -> str:
         t0 = time.perf_counter()
         result = self._wrapped.chat(messages, temperature, max_tokens)
         self.chat_time = time.perf_counter() - t0
+        # 累加 token 用量
+        usage = self._wrapped.last_usage
+        if usage:
+            self.total_prompt_tokens += usage.get("prompt_tokens", 0)
+            self.total_completion_tokens += usage.get("completion_tokens", 0)
         return result
 
     def __getattr__(self, name):

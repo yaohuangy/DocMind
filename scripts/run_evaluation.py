@@ -67,6 +67,17 @@ def main():
         action="store_true",
         help="显示详细日志",
     )
+    parser.add_argument(
+        "--with-generation",
+        action="store_true",
+        help="启用生成阶段评测（RAGAS 忠实度/相关性评分，耗时长且消耗 API 额度）",
+    )
+    parser.add_argument(
+        "--user-id", "-u",
+        type=str,
+        default="",
+        help="指定用户名，用于 ChromaDB 用户隔离过滤 (default: 不设置，使用 default)",
+    )
 
     args = parser.parse_args()
 
@@ -109,6 +120,8 @@ def main():
             dataset_path=args.dataset,
             methods=methods,
             top_k=args.top_k,
+            with_generation=args.with_generation,
+            user_id=args.user_id or None,
         )
     except FileNotFoundError as e:
         print(f"错误: {e}")
