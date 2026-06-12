@@ -9,7 +9,6 @@ import logging
 
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import Document as LlamaDocument
-from llama_index.core.schema import TextNode
 
 from src.core.config import ChunkConfig, get_config
 
@@ -103,7 +102,7 @@ class TextChunker:
             return []
 
         # LlamaIndex SentenceSplitter 的 get_nodes_from_documents 方法
-        nodes: list[TextNode] = self._splitter.get_nodes_from_documents(
+        nodes: list = self._splitter.get_nodes_from_documents(
             [document]
         )
 

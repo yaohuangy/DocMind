@@ -117,8 +117,8 @@ class EvaluationRunner:
             # 创建 QAEngine（使用计时组件）
             engine = QAEngine(self._config)
             # 替换为计时版本
-            engine._llm_client = inst_llm
-            engine._embedder = inst_embedder
+            engine._llm_client = inst_llm  # type: ignore[assignment]
+            engine._embedder = inst_embedder  # type: ignore[assignment]
             # 重建检索器缓存（使用新的计时组件）
             engine._retrievers = {}
 
@@ -203,7 +203,7 @@ class EvaluationRunner:
                 retrieved_chunk_ids=[],
                 retrieved_scores=[],
                 total_latency_sec=time.perf_counter() - t0,
-                phase_timings={"error": str(e)[:80]},
+                phase_timings={"error": -1.0},
             )
 
         wall_time = time.perf_counter() - t0

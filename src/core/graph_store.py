@@ -17,7 +17,7 @@ Usage::
 import logging
 from typing import Any
 
-from neo4j import GraphDatabase
+from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import Neo4jError, ServiceUnavailable
 
 from src.core.config import Neo4jConfig, get_config
@@ -49,7 +49,7 @@ class GraphStore:
         if config is None:
             config = get_config().neo4j
         self._config = config
-        self._driver = None
+        self._driver: Driver | None = None
 
     # ------------------------------------------------------------------
     # 连接管理

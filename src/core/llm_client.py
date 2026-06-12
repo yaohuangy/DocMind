@@ -113,7 +113,7 @@ class LLMClient:
             max_tokens=max_tokens if max_tokens is not None else self._config.max_tokens,
             stream=False,
         )
-        content = response.choices[0].message.content
+        content = response.choices[0].message.content  # type: ignore[union-attr]
         return content.strip() if content else ""
 
     def chat_stream(
@@ -141,7 +141,7 @@ class LLMClient:
             timeout=self._config.stream_timeout,
         )
         for chunk in stream:
-            delta = chunk.choices[0].delta
+            delta = chunk.choices[0].delta  # type: ignore[union-attr]
             if delta.content:
                 yield delta.content
 
