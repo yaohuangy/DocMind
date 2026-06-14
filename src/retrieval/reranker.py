@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # 模型缓存（进程级单例）
-_reranker_model: "CrossEncoder | None" = None
+_reranker_model: CrossEncoder | None = None
 _model_path: str | None = None
 
 
@@ -104,19 +104,20 @@ class Reranker:
 
         # 批量打分
         scores = self._model.predict(
-            pairs,
+            pairs,  # type: ignore[arg-type]
             batch_size=32,
             show_progress_bar=False,
         )
 
         # 单值转列表
+        scores_list: list[float]
         if not hasattr(scores, "__iter__"):
-            scores = [float(scores)]
+            scores_list = [float(scores)]  # type: ignore[arg-type]
         else:
-            scores = [float(s) for s in scores]
+            scores_list = [float(s) for s in scores]  # type: ignore[arg-type]
 
         # 合并分数并排序
-        for doc, score in zip(documents, scores):
+        for doc, score in zip(documents, scores_list):
             doc["rerank_score"] = score
 
         documents.sort(key=lambda d: d.get("rerank_score", 0), reverse=True)

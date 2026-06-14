@@ -173,12 +173,13 @@ class TextChunker:
     # 语义分块
     # ------------------------------------------------------------------
 
-    def _get_semantic_splitter(self) -> "SemanticSplitterNodeParser":
+    def _get_semantic_splitter(self) -> SemanticSplitterNodeParser:
         """懒加载 SemanticSplitterNodeParser。"""
         if self._semantic_splitter is None:
             from llama_index.core.node_parser import (
                 SemanticSplitterNodeParser,
             )
+            assert self._embed_model is not None, "语义分块需要 embed_model"
             self._semantic_splitter = SemanticSplitterNodeParser(
                 embed_model=self._embed_model,
                 buffer_size=self._config.semantic_buffer_size,
@@ -218,7 +219,7 @@ class TextChunker:
         )
 
         for node in nodes:
-            node_text = node.text or node.get_content()
+            node_text = node.get_content() or getattr(node, "text", "")
             if not node_text.strip():
                 continue
             token_count = len(self._tokenizer(node_text))

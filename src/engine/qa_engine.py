@@ -63,7 +63,7 @@ class QAEngine:
         self._metadata_store = MetadataStore(config.sqlite)
 
         # ---- 重排序器（懒加载） ----
-        self._reranker = None
+        self._reranker: Reranker | None = None  # type: ignore[name-defined]  # noqa: F821
 
         # ---- 子模块 ----
         self._ingest_pipeline = IngestPipeline(

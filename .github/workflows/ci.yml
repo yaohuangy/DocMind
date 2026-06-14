@@ -20,6 +20,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
       - name: Install dev dependencies
         run: pip install -r requirements-dev.txt
 

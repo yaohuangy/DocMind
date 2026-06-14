@@ -8,6 +8,7 @@
 import json
 import logging
 import time
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 
@@ -30,7 +31,8 @@ from src.evaluation.models import (
 
 logger = logging.getLogger(__name__)
 
-def _nanmean(values: list[float | None]) -> float | None:
+
+def _nanmean(values: Sequence[float | None]) -> float | None:
     """计算均值，跳过 None 和 NaN。"""
     clean = [v for v in values if v is not None and not (isinstance(v, float) and v != v)]
     return sum(clean) / len(clean) if clean else None
@@ -510,18 +512,32 @@ class EvaluationRunner:
             {"faithfulness": float|None, "answer_relevancy": float|None}
         """
         try:
-            # 修复 RAGAS 0.4.x 与新版 langchain 的兼容性问题
-            # 必须先导入 langchain_google_vertexai 并注册别名，
-            # 再导入 langchain_community（否则其内部的 vertexai 导入会失败）
+            # 修复 RAGAS 0.4.x 对 langchain_community 的硬依赖——
+            # 用虚拟包占位，不引入 langchain 全家桶。
             import sys as _sys
-            if "langchain_community.chat_models.vertexai" not in _sys.modules:
-                import langchain_google_vertexai  # noqa: F401
-                _sys.modules["langchain_community.chat_models.vertexai"] = (
-                    langchain_google_vertexai
-                )
-                import langchain_community.chat_models  # noqa: F401
+            import types as _types
+            class _DummyPkg(_types.ModuleType):
+                def __init__(self, name: str) -> None:
+                    super().__init__(name)
+                    self.__path__: list[str] = []
+                    self.__package__ = name
+            for _path in (
+                "langchain_community",
+                "langchain_community.chat_models",
+                "langchain_community.chat_models.vertexai",
+                "langchain_community.llms",
+            ):
+                if _path not in _sys.modules:
+                    _sys.modules[_path] = _DummyPkg(_path)
+            _sys.modules["langchain_community.chat_models.vertexai"].ChatVertexAI = (  # type: ignore[attr-defined]
+                _types.new_class("ChatVertexAI", ())
+            )
+            _sys.modules["langchain_community.llms"].VertexAI = (  # type: ignore[attr-defined]
+                _types.new_class("VertexAI", ())
+            )
             from ragas import EvaluationDataset, evaluate
             from ragas.llms import llm_factory
+
             # 注意：0.4.x 中 metrics.collections 的类不兼容 evaluate()，
             # 需用旧式模块级导入（0.5+ 会移除，届时切到 collections）
             from ragas.metrics import answer_relevancy, faithfulness  # noqa: F811
@@ -562,7 +578,7 @@ class EvaluationRunner:
 
             try:
                 faith_result = evaluate(
-                    dataset, metrics=[faithfulness], llm=eval_llm,
+                    dataset, metrics=[faithfulness], llm=eval_llm,  # type: ignore[arg-type]
                     show_progress=False, raise_exceptions=False,
                 )
                 scores = faith_result["faithfulness"]  # type: ignore[index]
@@ -574,7 +590,7 @@ class EvaluationRunner:
             try:
                 relev_result = evaluate(
                     dataset, metrics=[answer_relevancy],
-                    llm=eval_llm, embeddings=eval_embeddings,
+                    llm=eval_llm, embeddings=eval_embeddings,  # type: ignore[arg-type]
                     show_progress=False, raise_exceptions=False,
                 )
                 scores = relev_result["answer_relevancy"]  # type: ignore[index]
