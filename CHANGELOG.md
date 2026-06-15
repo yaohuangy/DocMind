@@ -1,5 +1,52 @@
 # 📋 更新日志
 
+## 2026-06-15
+
+### ⚡ 检索性能修复
+- 🐛 **修复 Streamlit 检索延迟**：`base_retriever.retrieve()` 在 Streamlit 的 asyncio 环境中走了 `ThreadPoolExecutor + asyncio.run()` 绕路，导致 Direct 检索从 0.2s 膨胀到 30s+。改为纯同步路径 `_retrieve_sync()`，Direct 检索恢复 0.2s，MQE+HyDE 约 3-5s。
+- ✅ 四个检索器（Direct / MQE / HyDE / Combined）均实现 `_retrieve_sync()` 方法。
+
+### 🧹 检索结果去重
+- ✅ **语义去重模块**：新增 `src/retrieval/dedup.py`，用字符 bigram Jaccard 相似度去重，无需嵌入 API 调用，O(N²) 但 N≤20 实测 < 1ms。
+- ✅ **配置**：`RetrievalConfig` 新增 `use_dedup` / `dedup_threshold` + 环境变量 `RETRIEVAL_DEDUP`（默认 true）/ `RETRIEVAL_DEDUP_THRESHOLD`（默认 0.65）。
+- ✅ **集成**：`qa_engine.retrieve()` 在检索后、重排序前自动去重。
+
+### 💰 在线 Token 成本看板
+- ✅ **Token 累加器**：`LLMClient` 新增 `accumulated_prompt` / `accumulated_completion` 累加器 + `total_token_usage` 属性 + `reset_token_counters()`。
+- ✅ **持久化**：`MetadataStore` 新增 `token_usage` 表 + `record_token_usage()` / `get_token_stats()` 方法。
+- ✅ **监控页**：新增「💰 Token 成本分析」区域——总 Token、输入/输出比、按方法柱状图、预估费用（¥）、近期记录。
+
+### ⏱️ 文档加载计时
+- ✅ **实时计时**：文档管理页加载时后台线程执行摄入，主线程每 0.3s 轮询更新进度条计时器（秒数实时跳动）。
+- ✅ **分步耗时**：摄入管线记录 5 步骤耗时（加载/分块/嵌入/入库/元数据），`IngestResult` 传递到 UI。
+- ✅ **持久记录**：`documents` 表新增 `total_sec` 列，加载耗时永久存储，文档列表中每条记录旁显示 ⏱ 标记。
+- ✅ **文件列表自动清空**：加载完成后 `file_uploader` 动态 key 递增，强制重置为空。
+
+### 🧪 单元测试
+- ✅ **173 个测试用例**（之前 31 个），新增 6 个测试文件：
+  - `test_citation_formatter.py`（31 用例）— 8 种格式位置描述 + 引用解析 + 编号重映射
+  - `test_prompt_templates.py`（11 用例）— 全部 7 个模板占位符验证
+  - `test_models.py`（18 用例）— DTO 序列化/反序列化往返
+  - `test_fusion_internals.py`（10 用例）— MinMax 归一化边界 + 加权合并
+  - `test_chunk_config.py`（16 用例）— 8 种格式预设 + 回退逻辑
+  - `test_llm_client.py`（17 用例）— 概念提取解析 + 查询变体 JSON 回退
+  - `test_qa_engine_normalize_method.py`（20 用例）— 中英文/大小写/分隔符全路径
+  - `test_dedup.py`（19 用例）— bigram/Jaccard/去重边界
+
+### 🔧 监控页改进
+- ✅ 反馈记录列表每条加 🗑 单条删除按钮
+- ✅ Token 记录列表每条加 🗑 单条删除按钮
+- ✅ 新增「🧹 清理异常数据」批量删除（按延迟阈值）
+- ✅ 概念提取改为后台线程，不阻塞页面刷新和 👍/👎 按钮
+
+### 🩺 诊断脚本
+- ✅ `scripts/diagnose_retrieval.py` — 分别测量嵌入 API / ChromaDB 搜索 / 端到端检索耗时
+- ✅ `scripts/diagnose_llm.py` — 分别测量 MQE 变体 / HyDE 假设 / 答案生成 三类 LLM 调用耗时
+
+### 📝 文档
+- 📝 更新 `.env.example`：新增 `RETRIEVAL_DEDUP` / `RETRIEVAL_DEDUP_THRESHOLD`
+- 📝 更新 `README.md`：去重压缩 ✅、在线 Token 看板 ✅、单元测试覆盖 ✅、加载计时、检索去重、监控改进
+
 ## 2026-06-14
 
 ### 🔍 重排序（Cross-Encoder Reranker）
