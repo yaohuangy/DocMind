@@ -81,6 +81,10 @@ class RetrievalConfig:
     use_reranker: bool = False     # 启用 BAAI/bge-reranker-v2-m3 重排序
     reranker_top_k: int = 20       # 粗筛取 top-N 后再精排
 
+    # 去重（文本相似度去重）
+    use_dedup: bool = True          # 启用检索结果语义去重
+    dedup_threshold: float = 0.65   # bigram Jaccard 相似度阈值（0-1）
+
 
 @dataclass
 class ChunkConfig:
@@ -254,6 +258,8 @@ def load_config() -> Settings:
             rrf_k=_env_int("RRF_K", 60),
             use_reranker=_env_bool("USE_RERANKER", False),
             reranker_top_k=_env_int("RERANKER_TOP_K", 20),
+            use_dedup=_env_bool("RETRIEVAL_DEDUP", True),
+            dedup_threshold=_env_float("RETRIEVAL_DEDUP_THRESHOLD", 0.65),
         ),
         chunk=ChunkConfig(
             chunk_size=_env_int("CHUNK_SIZE", 1024),

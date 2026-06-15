@@ -89,6 +89,10 @@ class LLMClient:
         # 最近一次 API 调用的 token 用量
         self.last_usage: dict[str, int] = {}
 
+        # 累加器——跨调用累计 token（调用方手动 reset）
+        self.accumulated_prompt: int = 0
+        self.accumulated_completion: int = 0
+
     # ------------------------------------------------------------------
     # 底层调用
     # ------------------------------------------------------------------
@@ -123,6 +127,9 @@ class LLMClient:
                 "completion_tokens": response.usage.completion_tokens,  # type: ignore[union-attr]
                 "total_tokens": response.usage.total_tokens,  # type: ignore[union-attr]
             }
+            # 累加
+            self.accumulated_prompt += response.usage.prompt_tokens  # type: ignore[union-attr]
+            self.accumulated_completion += response.usage.completion_tokens  # type: ignore[union-attr]
         content = response.choices[0].message.content  # type: ignore[union-attr]
         return content.strip() if content else ""
 
@@ -272,6 +279,24 @@ class LLMClient:
         logger.info("提取到 %d 个概念: %s", len(concepts),
                     [c["name"] for c in concepts])
         return concepts
+
+    # ------------------------------------------------------------------
+    # Token 累加器
+    # ------------------------------------------------------------------
+
+    @property
+    def total_token_usage(self) -> dict[str, int]:
+        """获取累加器中的 token 总量（自上次 reset 以来）。"""
+        return {
+            "prompt_tokens": self.accumulated_prompt,
+            "completion_tokens": self.accumulated_completion,
+            "total_tokens": self.accumulated_prompt + self.accumulated_completion,
+        }
+
+    def reset_token_counters(self) -> None:
+        """重置累加器（通常在每次问答结束后调用）。"""
+        self.accumulated_prompt = 0
+        self.accumulated_completion = 0
 
     @property
     def model(self) -> str:

@@ -137,9 +137,13 @@ class IngestPipeline:
         Raises:
             ValueError: 格式不支持。
         """
+        import time as _time
+
+        t_start = _time.perf_counter()
         logger.info("=== 开始摄入: %s ===", source)
 
         # ---- 1. 加载 ----
+        t0 = _time.perf_counter()
         documents = self._loader.load(source)
         if not documents:
             raise RuntimeError(f"文档未提取到有效内容: {source}")
@@ -150,8 +154,9 @@ class IngestPipeline:
         doc_format = documents[0].metadata.get("format", "unknown")
         total_chars = sum(len(d.text) for d in documents)
         num_pages = self._extract_page_count(documents)
+        t_load = _time.perf_counter() - t0
 
-        logger.info("步骤1/4 加载完成: %d 个文档段落, %d 字符", len(documents), total_chars)
+        logger.info("步骤1/4 加载完成: %d 个文档段落, %d 字符 (%.1fs)", len(documents), total_chars, t_load)
 
         # 如果之前摄入过同一文档，先清理旧数据（幂等）
         self._vector_store.delete_by_doc_id(
@@ -159,6 +164,7 @@ class IngestPipeline:
         )
 
         # ---- 2. 分块（按文档格式自适应参数） ----
+        t0 = _time.perf_counter()
         chunk_size, chunk_overlap = get_config().chunk.get_chunk_params(doc_format)
         global_chunk = get_config().chunk
         fmt_chunk_config = ChunkConfig(
@@ -177,34 +183,36 @@ class IngestPipeline:
         chunks = fmt_chunker.split(documents)
         if not chunks:
             raise RuntimeError(f"文档分块后无内容: {source}")
+        t_chunk = _time.perf_counter() - t0
 
         logger.info(
             "步骤2/4 分块完成: %d → %d chunks "
-            "(fmt=%s, size=%d, overlap=%d, semantic=%s)",
+            "(fmt=%s, size=%d, overlap=%d, semantic=%s, %.1fs)",
             len(documents), len(chunks), doc_format,
-            chunk_size, chunk_overlap, global_chunk.use_semantic_chunking,
+            chunk_size, chunk_overlap, global_chunk.use_semantic_chunking, t_chunk,
         )
 
         # ---- 3. 嵌入 ----
+        t0 = _time.perf_counter()
         chunk_texts = [c.text for c in chunks]
         embeddings = self._embedder.embed(chunk_texts)
         if len(embeddings) != len(chunks):
             raise RuntimeError(
                 f"嵌入向量数 ({len(embeddings)}) 与 chunk 数 ({len(chunks)}) 不匹配"
             )
+        t_embed = _time.perf_counter() - t0
 
-        logger.info("步骤3/4 嵌入完成: %d 个向量, 维度=%d", len(embeddings), len(embeddings[0]) if embeddings else 0)
+        logger.info("步骤3/4 嵌入完成: %d 个向量, 维度=%d (%.1fs)", len(embeddings), len(embeddings[0]) if embeddings else 0, t_embed)
 
         # ---- 4. 向量入库 ----
+        t0 = _time.perf_counter()
         chunk_ids: list[str] = []
         for i, chunk in enumerate(chunks):
-            # 用全局序号确保唯一（PDF 等多页文档每页 chunk_index 从 0 开始会重复）
             cid = hashlib.sha256(
                 f"{source}:{i}".encode()
             ).hexdigest()[:16]
             chunk_ids.append(cid)
 
-        # 补全 chunk metadata（确保 vector_store 中有 doc_id 和 user_id）
         metadatas = []
         for chunk in chunks:
             meta = dict(chunk.metadata)
@@ -219,10 +227,13 @@ class IngestPipeline:
             embeddings=embeddings,
             metadatas=metadatas,
         )
+        t_store = _time.perf_counter() - t0
 
-        logger.info("步骤4/4 向量入库完成: %d 条", len(chunk_ids))
+        logger.info("步骤4/4 向量入库完成: %d 条 (%.1fs)", len(chunk_ids), t_store)
 
         # ---- 5. 元数据记录 ----
+        t0 = _time.perf_counter()
+        total_elapsed = round(_time.perf_counter() - t_start, 1)
         self._metadata_store.add_document(
             doc_id=doc_id,
             name=doc_name,
@@ -233,7 +244,9 @@ class IngestPipeline:
             num_pages=num_pages,
             char_count=total_chars,
             loaded_at=datetime.now().isoformat(),
+            total_sec=total_elapsed,
         )
+        t_meta = _time.perf_counter() - t0
 
         result = IngestResult(
             doc_id=doc_id,
@@ -244,9 +257,17 @@ class IngestPipeline:
             num_pages=num_pages,
             char_count=total_chars,
             loaded_at=datetime.now().isoformat(),
+            step_timings={
+                "加载": round(t_load, 2),
+                "分块": round(t_chunk, 2),
+                "嵌入": round(t_embed, 2),
+                "入库": round(t_store, 2),
+                "元数据": round(t_meta, 2),
+            },
+            total_sec=total_elapsed,
         )
 
-        logger.info("=== 摄入完成: %s ===", result)
+        logger.info("=== 摄入完成: %s (总耗时 %.1fs) ===", result, total_elapsed)
         return result
 
     def ingest_batch(self, sources: list[str], user_id: str = "default") -> list["IngestResult"]:
@@ -362,6 +383,8 @@ class IngestResult:
         num_pages: 页数/幻灯片数（如适用）。
         char_count: 总字符数。
         loaded_at: 加载时间 ISO 字符串。
+        step_timings: 各步骤耗时字典 {"加载": sec, "分块": sec, "嵌入": sec, "入库": sec}。
+        total_sec: 摄入总耗时。
     """
 
     def __init__(
@@ -374,6 +397,8 @@ class IngestResult:
         num_pages: int,
         char_count: int,
         loaded_at: str,
+        step_timings: dict[str, float] | None = None,
+        total_sec: float = 0.0,
     ) -> None:
         self.doc_id = doc_id
         self.doc_name = doc_name
@@ -383,12 +408,14 @@ class IngestResult:
         self.num_pages = num_pages
         self.char_count = char_count
         self.loaded_at = loaded_at
+        self.step_timings = step_timings or {}
+        self.total_sec = total_sec
 
     def __repr__(self) -> str:
         return (
             f"IngestResult(doc_id={self.doc_id!r}, name={self.doc_name!r}, "
             f"fmt={self.doc_format}, chunks={self.num_chunks}, "
-            f"chars={self.char_count})"
+            f"chars={self.char_count}, total={self.total_sec:.1f}s)"
         )
 
     def to_dict(self) -> dict:
@@ -402,4 +429,6 @@ class IngestResult:
             "num_pages": self.num_pages,
             "char_count": self.char_count,
             "loaded_at": self.loaded_at,
+            "step_timings": self.step_timings,
+            "total_sec": self.total_sec,
         }

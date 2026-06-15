@@ -95,3 +95,38 @@ class HyDERetriever(BaseRetriever):
 
         logger.info("HyDE 检索完成: %d 结果", len(results))
         return results
+
+    def _retrieve_sync(
+        self,
+        question: str,
+        top_k: int = 10,
+    ) -> list[SearchResult]:
+        """HyDE 检索——纯同步路径（绕开 asyncio 开销）。
+
+        在 Streamlit 等有事件循环的环境中自动使用此路径。
+        """
+        # 1. 生成假设答案（同步 LLM 调用）
+        hypothetical_answer = self._llm_client.generate_hypothetical_answer(question)
+
+        if not hypothetical_answer:
+            logger.warning("HyDE [sync]: 假设答案生成为空，回退到直接嵌入原问题")
+            query_text = question
+        else:
+            query_text = hypothetical_answer
+            logger.info(
+                "HyDE [sync]: 假设答案生成完成 (%d 字符)", len(hypothetical_answer)
+            )
+
+        # 2. 嵌入
+        query_embedding = self._embedder.embed_query(query_text)
+
+        # 3. 检索
+        results = self._vector_store.search(
+            collection_name=VectorStore.DOCUMENT_CHUNKS,
+            query_embedding=query_embedding,
+            limit=top_k,
+            where=self._where_filter,
+        )
+
+        logger.info("HyDE 检索完成 [sync]: %d 结果", len(results))
+        return results

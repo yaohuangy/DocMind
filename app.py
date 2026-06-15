@@ -489,21 +489,36 @@ if prompt := st.chat_input("输入你的问题..."):
             "latency_sec": retrieval_latency,
         })
 
-        try:
-            engine.record_interaction(
-                question=prompt,
-                answer=formatted_answer,
-                sources=cited_sources if cited_sources else sources,
-            )
-            st.toast("✅ 已存入记忆系统", icon="🧠")
-        except Exception as e:
-            st.warning(f"记忆记录失败（不影响问答）: {e}")
-
-        # 持久化聊天记录
+        # 持久化聊天记录（快速，不阻塞）
         try:
             engine.save_conversation(st.session_state.messages)
         except Exception:
             pass
 
-        # 刷新页面，让聊天历史循环渲染新增消息的 👍/👎 按钮
+        # 记录 Token 用量（快速，SQLite 单行插入）
+        try:
+            engine.record_token_usage(method=method)
+        except Exception:
+            pass
+
+        # 概念提取 + 记忆记录放到后台线程，不阻塞页面刷新
+        # （LLM 概念提取可能耗时 2-10 秒，用户不需要等它完成）
+        import threading
+        _qa = prompt
+        _ans = formatted_answer
+        _srcs = cited_sources if cited_sources else sources
+
+        def _background_memory():
+            try:
+                engine.record_interaction(
+                    question=_qa,
+                    answer=_ans,
+                    sources=_srcs,
+                )
+            except Exception:
+                pass
+
+        threading.Thread(target=_background_memory, daemon=True).start()
+
+        # 立即刷新页面，让 👍/👎 按钮即刻出现
         st.rerun()

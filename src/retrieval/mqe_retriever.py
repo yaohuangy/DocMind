@@ -111,3 +111,53 @@ class MQERetriever(BaseRetriever):
 
         logger.info("MQE 检索完成: %d 路 → RRF → %d 结果", len(batch_results), len(fused))
         return fused
+
+    def _retrieve_sync(
+        self,
+        question: str,
+        top_k: int = 10,
+    ) -> list[SearchResult]:
+        """MQE 检索——纯同步路径（绕开 asyncio 开销）。
+
+        在 Streamlit 等有事件循环的环境中自动使用此路径。
+        """
+        # 1. 生成查询变体（同步 LLM 调用）
+        variants = self._llm_client.generate_query_variants(
+            question, self._num_variants
+        )
+
+        all_queries = [question] + variants
+        logger.info(
+            "MQE [sync]: 生成 %d 个变体, 共 %d 路查询",
+            len(variants), len(all_queries),
+        )
+
+        # 2. 嵌入所有查询
+        query_embeddings = self._embedder.embed(all_queries)
+
+        # 3. 逐路检索（同步）
+        batch_results: list[list[SearchResult]] = []
+        for emb in query_embeddings:
+            results = self._vector_store.search(
+                collection_name=VectorStore.DOCUMENT_CHUNKS,
+                query_embedding=emb,
+                limit=top_k,
+                where=self._where_filter,
+            )
+            batch_results.append(results)
+
+        logger.info(
+            "MQE [sync]: %d 路检索完成, 各路结果数: %s",
+            len(batch_results),
+            [len(r) for r in batch_results],
+        )
+
+        # 4. RRF 融合
+        fused = reciprocal_rank_fusion(
+            result_lists=batch_results,
+            k=60,
+            top_k=top_k,
+        )
+
+        logger.info("MQE 检索完成 [sync]: %d 路 → RRF → %d 结果", len(batch_results), len(fused))
+        return fused

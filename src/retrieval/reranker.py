@@ -69,12 +69,19 @@ class Reranker:
         if _reranker_model is not None and _model_path == model_path:
             self._model = _reranker_model
         else:
-            from sentence_transformers import CrossEncoder
+            try:
+                from sentence_transformers import CrossEncoder
 
-            logger.info("加载重排序模型: %s", model_path)
-            self._model = CrossEncoder(model_path, trust_remote_code=True)
-            _reranker_model = self._model
-            _model_path = model_path
+                logger.info("加载重排序模型: %s", model_path)
+                self._model = CrossEncoder(model_path, trust_remote_code=True)
+                _reranker_model = self._model
+                _model_path = model_path
+            except Exception as e:
+                logger.warning(
+                    "重排序模型加载失败（%s），重排序将禁用。可设置 USE_RERANKER=false 跳过。",
+                    e,
+                )
+                self._model = None
 
     # ------------------------------------------------------------------
     # 重排序入口
@@ -96,8 +103,8 @@ class Reranker:
         Returns:
             重排序后的文档列表，每项追加 ``rerank_score`` 字段。
         """
-        if not documents:
-            return []
+        if not documents or self._model is None:
+            return documents[:top_k]
 
         # 构建 (query, doc_text) 对
         pairs = [(query, d.get("text", "")) for d in documents]

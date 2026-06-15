@@ -152,3 +152,56 @@ class CombinedRetriever(BaseRetriever):
             len(mqe_results), len(hyde_results), len(merged),
         )
         return merged
+
+    def _retrieve_sync(
+        self,
+        question: str,
+        top_k: int = 10,
+    ) -> list[SearchResult]:
+        """MQE + HyDE 组合检索——纯同步路径。
+
+        两个分支串行执行（同步环境下无法并行），
+        总延迟 ≈ MQE + HyDE，但避免了 asyncio 在 Streamlit 中的额外开销。
+        """
+        hyde_weight = self._config.hyde_weight
+        direct_weight = 1.0 - hyde_weight
+
+        logger.info(
+            "Combined 检索开始 [sync]: MQE(w=%.1f) + HyDE(w=%.1f)",
+            direct_weight, hyde_weight,
+        )
+
+        # 串行执行两个分支（同步环境无法并行 LLM 调用）
+        mqe_results: list[SearchResult] = []
+        hyde_results: list[SearchResult] = []
+
+        try:
+            mqe_results = self._mqe_retriever._retrieve_sync(question, top_k=top_k)
+        except Exception:
+            logger.exception("MQE 分支失败 [sync]")
+
+        try:
+            hyde_results = self._hyde_retriever._retrieve_sync(question, top_k=top_k)
+        except Exception:
+            logger.exception("HyDE 分支失败 [sync]")
+
+        logger.info(
+            "Combined 分支完成 [sync]: MQE=%d 结果, HyDE=%d 结果",
+            len(mqe_results), len(hyde_results),
+        )
+
+        # 加权合并
+        merged = weighted_merge(
+            results_a=mqe_results,
+            results_b=hyde_results,
+            weight_a=direct_weight,
+            weight_b=hyde_weight,
+            top_k=top_k,
+            normalize=True,
+        )
+
+        logger.info(
+            "Combined 检索完成 [sync]: MQE(%d) + HyDE(%d) → 合并 %d 结果",
+            len(mqe_results), len(hyde_results), len(merged),
+        )
+        return merged

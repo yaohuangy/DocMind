@@ -52,6 +52,11 @@ class BaseRetriever(ABC):
     ) -> list[SearchResult]:
         """同步检索（自动管理事件循环）。
 
+        智能路由：
+        - 无运行中事件循环 → asyncio.run（标准路径）
+        - 有运行中事件循环（如 Streamlit）→ 直接同步执行，避免
+          ThreadPoolExecutor + asyncio.run 的额外开销
+
         Args:
             question: 用户问题。
             top_k: 返回结果数。
@@ -60,15 +65,21 @@ class BaseRetriever(ABC):
             SearchResult 列表，按分数降序排列。
         """
         try:
-            _ = asyncio.get_running_loop()  # 仅检测是否有运行中的事件循环
-            # 已有运行中的事件循环（如在 Jupyter/Streamlit 中）
-            # 使用 nest_asyncio 或新建线程中的 loop
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(
-                    asyncio.run, self.retrieve_async(question, top_k)
-                )
-                return future.result()
+            _ = asyncio.get_running_loop()
+            # Streamlit / Jupyter 等有事件循环的环境：
+            # 不用 ThreadPoolExecutor + asyncio.run()，直接走同步路径
+            return self._retrieve_sync(question, top_k)
         except RuntimeError:
-            # 无运行中事件循环，直接 asyncio.run
+            # 无事件循环：标准 asyncio 路径
             return asyncio.run(self.retrieve_async(question, top_k))
+
+    def _retrieve_sync(
+        self,
+        question: str,
+        top_k: int = 10,
+    ) -> list[SearchResult]:
+        """同步检索——子类可选实现。
+
+        默认回退到 asyncio.run()。子类应覆盖此方法以避免 asyncio 开销。
+        """
+        return asyncio.run(self.retrieve_async(question, top_k))

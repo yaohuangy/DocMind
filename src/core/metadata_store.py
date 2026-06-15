@@ -127,6 +127,16 @@ class MetadataStore:
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (user_id)
             );
+
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                method TEXT NOT NULL,
+                prompt_tokens INTEGER NOT NULL DEFAULT 0,
+                completion_tokens INTEGER NOT NULL DEFAULT 0,
+                total_tokens INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
         """)
         conn.commit()
 
@@ -135,6 +145,14 @@ class MetadataStore:
             conn.execute("ALTER TABLE documents ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default'")
             conn.commit()
             logger.info("已为 documents 表添加 user_id 列")
+        except Exception:
+            pass  # 列已存在，忽略
+
+        # 迁移：为旧数据库添加 total_sec 列（如果不存在）
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN total_sec REAL NOT NULL DEFAULT 0.0")
+            conn.commit()
+            logger.info("已为 documents 表添加 total_sec 列")
         except Exception:
             pass  # 列已存在，忽略
 
@@ -155,6 +173,7 @@ class MetadataStore:
         num_pages: int = 0,
         char_count: int = 0,
         loaded_at: str = "",
+        total_sec: float = 0.0,
     ) -> None:
         """添加/更新文档记录。
 
@@ -168,6 +187,7 @@ class MetadataStore:
             num_pages: 页数。
             char_count: 总字符数。
             loaded_at: 加载时间。
+            total_sec: 加载总耗时（秒）。
         """
         from datetime import datetime
 
@@ -175,15 +195,16 @@ class MetadataStore:
 
         self._conn.execute(
             """
-            INSERT INTO documents (doc_id, name, source, format, user_id, num_chunks, num_pages, char_count, loaded_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO documents (doc_id, name, source, format, user_id, num_chunks, num_pages, char_count, loaded_at, total_sec)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(doc_id) DO UPDATE SET
                 num_chunks = excluded.num_chunks,
                 num_pages = excluded.num_pages,
                 char_count = excluded.char_count,
-                loaded_at = excluded.loaded_at
+                loaded_at = excluded.loaded_at,
+                total_sec = excluded.total_sec
             """,
-            (doc_id, name, source, doc_format, user_id, num_chunks, num_pages, char_count, loaded_at),
+            (doc_id, name, source, doc_format, user_id, num_chunks, num_pages, char_count, loaded_at, total_sec),
         )
         self._conn.commit()
         logger.info("文档已记录: %s (%s, %d chunks, user=%s)", name, doc_format, num_chunks, user_id)
@@ -499,6 +520,55 @@ class MetadataStore:
             "recent": records[:10],
         }
 
+    def delete_feedback(self, feedback_id: int) -> bool:
+        """删除单条反馈记录。
+
+        Args:
+            feedback_id: 反馈记录 ID。
+
+        Returns:
+            是否实际删除了记录。
+        """
+        cursor = self._conn.execute(
+            "DELETE FROM feedback WHERE id = ?", (feedback_id,)
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    def delete_feedback_by_latency(self, user_id: str, min_latency: float) -> int:
+        """删除指定用户所有延迟 >= min_latency 的反馈记录。
+
+        用于清理异常慢的检索数据，避免拉偏平均值。
+
+        Args:
+            user_id: 用户名。
+            min_latency: 最小延迟阈值（秒）。
+
+        Returns:
+            删除的记录数。
+        """
+        cursor = self._conn.execute(
+            "DELETE FROM feedback WHERE user_id = ? AND latency_sec >= ?",
+            (user_id, min_latency),
+        )
+        self._conn.commit()
+        return cursor.rowcount
+
+    def delete_token_usage_record(self, usage_id: int) -> bool:
+        """删除单条 Token 用量记录。
+
+        Args:
+            usage_id: 记录 ID。
+
+        Returns:
+            是否实际删除了记录。
+        """
+        cursor = self._conn.execute(
+            "DELETE FROM token_usage WHERE id = ?", (usage_id,)
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
     # ------------------------------------------------------------------
     # 会话消息持久化
     # ------------------------------------------------------------------
@@ -557,6 +627,86 @@ class MetadataStore:
             "DELETE FROM conversation_history WHERE user_id = ?", (user_id,)
         )
         self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Token 用量记录
+    # ------------------------------------------------------------------
+
+    def record_token_usage(
+        self,
+        user_id: str,
+        method: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+    ) -> None:
+        """记录一次 LLM 调用的 Token 用量。
+
+        Args:
+            user_id: 用户名。
+            method: 检索方法。
+            prompt_tokens: 输入 token 数。
+            completion_tokens: 输出 token 数。
+        """
+        from datetime import datetime
+        total = prompt_tokens + completion_tokens
+        self._conn.execute(
+            """
+            INSERT INTO token_usage (user_id, method, prompt_tokens, completion_tokens, total_tokens, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, method, prompt_tokens, completion_tokens, total, datetime.now().isoformat()),
+        )
+        self._conn.commit()
+
+    def get_token_stats(
+        self,
+        user_id: str | None = None,
+    ) -> dict:
+        """获取 Token 用量统计。
+
+        Args:
+            user_id: 按用户过滤，None 返回全部。
+
+        Returns:
+            {
+                "total_prompt": int,
+                "total_completion": int,
+                "total_tokens": int,
+                "total_calls": int,
+                "by_method": {method: {"prompt": n, "completion": n, "total": n, "calls": n}},
+                "recent": [dict, ...],
+            }
+        """
+        query = "SELECT * FROM token_usage WHERE 1=1"
+        params: list[Any] = []
+        if user_id:
+            query += " AND user_id = ?"
+            params.append(user_id)
+
+        rows = self._conn.execute(query + " ORDER BY created_at DESC", params).fetchall()
+        records = [dict(r) for r in rows]
+
+        total_prompt = sum(r["prompt_tokens"] for r in records)
+        total_completion = sum(r["completion_tokens"] for r in records)
+
+        by_method: dict[str, dict] = {}
+        for r in records:
+            m = r["method"]
+            if m not in by_method:
+                by_method[m] = {"prompt": 0, "completion": 0, "total": 0, "calls": 0}
+            by_method[m]["prompt"] += r["prompt_tokens"]
+            by_method[m]["completion"] += r["completion_tokens"]
+            by_method[m]["total"] += r["total_tokens"]
+            by_method[m]["calls"] += 1
+
+        return {
+            "total_prompt": total_prompt,
+            "total_completion": total_completion,
+            "total_tokens": total_prompt + total_completion,
+            "total_calls": len(records),
+            "by_method": by_method,
+            "recent": records[:20],
+        }
 
     # ------------------------------------------------------------------
     # 统计聚合

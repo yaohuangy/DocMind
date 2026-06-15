@@ -43,20 +43,50 @@ with tab_upload:
     st.caption("支持格式: PDF, Word (.docx), Markdown (.md), TXT, PPT (.pptx), CSV, Excel (.xlsx)")
     st.caption("⚙️ 分块参数（如分块大小、重叠数）由管理员在 `.env` 文件中统一配置，加载时自动应用。")
 
+    # 动态 key：加载完成后 +1，强制 file_uploader 重置为空
+    if "uploader_key" not in st.session_state:
+        st.session_state.uploader_key = 0
+
     uploaded_files = st.file_uploader(
         "选择文档文件",
         type=["pdf", "docx", "md", "txt", "pptx", "csv", "xlsx"],
         accept_multiple_files=True,
-        key="doc_uploader",
-        help="可一次选择多个文件。上传后会自动暂存并等待加载。",
+        key=f"doc_uploader_{st.session_state.uploader_key}",
+        help="可一次选择多个文件。加载完成后列表自动清空。",
     )
+
+    # 展示上次加载结果的耗时分解（跨 rerun 持久化）
+    if "ingest_results" in st.session_state and st.session_state.ingest_results:
+        results_to_show = st.session_state.ingest_results
+        for r in results_to_show:
+            timing = r.get("step_timings", {})
+            total = r.get("total_sec", 0)
+            if timing:
+                steps_html = "".join(
+                    f"<tr><td>{step}</td><td style='text-align:right'>{sec:.1f}s</td></tr>"
+                    for step, sec in timing.items()
+                )
+                st.markdown(
+                    f"**{r['doc_name']}** 总耗时 {total:.1f}s  \n"
+                    f"<table style='font-size:0.85rem;margin-top:4px'>"
+                    f"<tr><th>步骤</th><th>耗时</th></tr>{steps_html}"
+                    f"<tr style='font-weight:600'><td>合计</td>"
+                    f"<td style='text-align:right'>{total:.1f}s</td></tr>"
+                    f"</table>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption(f"**{r['doc_name']}** 总耗时 {total:.1f}s")
+        st.divider()
+        del st.session_state.ingest_results
 
     if st.button("🚀 开始加载文件", type="primary", use_container_width=True):
         if not uploaded_files:
             st.warning("请先选择要上传的文件。")
         else:
-            # 暂存上传的文件到本地
             import tempfile
+            import threading
+            import time as _time
             from pathlib import Path
 
             temp_dir = Path(tempfile.mkdtemp(prefix="docmind_"))
@@ -67,26 +97,70 @@ with tab_upload:
                 save_path.write_bytes(uf.getvalue())
                 saved_paths.append(str(save_path))
 
-            # 摄入
-            progress = st.progress(0, text="正在加载文档...")
+            # 摄入（后台线程 + 主线程实时计时轮询）
+            t_total_start = _time.perf_counter()
+            progress_bar = st.progress(0, text="准备中...")
             results = []
             total = len(saved_paths)
 
             for i, path in enumerate(saved_paths):
-                progress.progress(
-                    (i + 0.5) / total,
-                    text=f"处理中 ({i + 1}/{total}): {Path(path).name}",
-                )
-                try:
-                    result = engine.ingest(path)
-                    results.append(result)
-                except Exception as e:
-                    st.error(f"加载失败 [{Path(path).name}]: {e}")
+                # 后台线程执行摄入
+                result_holder: list = []
+                error_holder: list = []
+                done = threading.Event()
 
-            progress.progress(1.0, text=f"完成! 成功加载 {len(results)}/{total} 个文档")
+                def _ingest(p=path):
+                    try:
+                        result_holder.append(engine.ingest(p))
+                    except Exception as e:
+                        error_holder.append(e)
+                    done.set()
+
+                thread = threading.Thread(target=_ingest, daemon=True)
+                thread.start()
+
+                # 主线程轮询：每 0.3s 更新一次计时器
+                while not done.is_set():
+                    elapsed = _time.perf_counter() - t_total_start
+                    progress_bar.progress(
+                        (i + 0.05) / total,
+                        text=f"处理中 ({i + 1}/{total}): {Path(path).name}  |  ⏱ {elapsed:.0f}s",
+                    )
+                    thread.join(timeout=0.3)
+
+                thread.join()  # 确保线程完全结束
+
+                if error_holder:
+                    st.error(f"加载失败 [{Path(path).name}]: {error_holder[0]}")
+                elif result_holder:
+                    results.append(result_holder[0])
+
+                elapsed = _time.perf_counter() - t_total_start
+                progress_bar.progress(
+                    (i + 1) / total,
+                    text=f"完成 ({i + 1}/{total}): {Path(path).name}  |  ⏱ {elapsed:.0f}s",
+                )
+
+            total_elapsed = _time.perf_counter() - t_total_start
+            progress_bar.progress(
+                1.0,
+                text=f"✅ 全部完成! {len(results)}/{total} 个文档  |  ⏱ 总耗时 {total_elapsed:.0f}s",
+            )
+
             if results:
-                st.success(f"✅ 成功加载 {len(results)} 个文档")
-                st.rerun()
+                # 存入 session_state 跨 rerun 持久化
+                st.session_state.ingest_results = [
+                    {
+                        "doc_name": r.doc_name,
+                        "total_sec": r.total_sec,
+                        "step_timings": r.step_timings,
+                    }
+                    for r in results
+                ]
+
+            # 清除文件上传列表：递增 key 强制重建 widget
+            st.session_state.uploader_key += 1
+            st.rerun()
 
 with tab_url:
     st.caption("输入网页 URL，自动提取正文内容（过滤导航、广告等噪声）")
@@ -148,6 +222,7 @@ else:
         chunks = doc.get("num_chunks", 0)
         chars = doc.get("char_count", 0)
         loaded = doc.get("loaded_at", "")[:19]
+        total_sec = doc.get("total_sec", 0.0)
 
         # 格式图标
         fmt_icons = {
@@ -156,11 +231,23 @@ else:
         }
         icon = fmt_icons.get(fmt, "📎")
 
+        # 耗时显示
+        if total_sec > 0:
+            if total_sec < 60:
+                time_str = f"{total_sec:.0f}s"
+            else:
+                m, s = divmod(total_sec, 60)
+                time_str = f"{int(m)}m{s:.0f}s"
+            time_col = f"⏱ {time_str}"
+        else:
+            time_col = ""
+
         col_info, col_del = st.columns([8, 1])
         with col_info:
             st.markdown(
                 f"{icon} **{name}**  "
                 f"`{fmt.upper()}` | {chunks} chunks | {chars:,} 字符 | {loaded}"
+                + (f" | {time_col}" if time_col else "")
             )
         with col_del:
             if st.button("🗑️", key=f"del_{doc_id}", help=f"删除 {name}"):

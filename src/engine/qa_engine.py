@@ -137,6 +137,8 @@ class QAEngine:
                 num_pages=pipe_result.num_pages,
                 char_count=pipe_result.char_count,
                 loaded_at=pipe_result.loaded_at,
+                step_timings=pipe_result.step_timings,
+                total_sec=pipe_result.total_sec,
             )
             return result
         except ValueError as e:
@@ -169,6 +171,8 @@ class QAEngine:
                 num_pages=r.num_pages,
                 char_count=r.char_count,
                 loaded_at=r.loaded_at,
+                step_timings=r.step_timings,
+                total_sec=r.total_sec,
             )
             for r in pipe_results
         ]
@@ -228,6 +232,20 @@ class QAEngine:
         except Exception as e:
             logger.error("检索失败 [%s]: %s", method_key, e)
             return []
+
+        # 去重（文本相似度去重，减少冗余信息送入 LLM）
+        if self._config.retrieval.use_dedup and len(search_results) > 1:
+            from src.retrieval.dedup import deduplicate_chunks
+
+            before = len(search_results)
+            search_results = deduplicate_chunks(
+                search_results,
+                threshold=self._config.retrieval.dedup_threshold,
+            )
+            logger.info(
+                "去重: %d → %d 结果 (threshold=%.2f)",
+                before, len(search_results), self._config.retrieval.dedup_threshold,
+            )
 
         # 重排序（Cross-Encoder 精排）
         if self._config.retrieval.use_reranker and len(search_results) > 1:
@@ -551,6 +569,34 @@ class QAEngine:
         if self.memory is None:
             return []
         return self.memory.get_history(limit)
+
+    def record_token_usage(self, method: str) -> None:
+        """记录当前问答的 Token 消耗到 SQLite（从 LLMClient 累加器读取并重置）。
+
+        Args:
+            method: 检索方法。
+        """
+        usage = self._llm_client.total_token_usage
+        if usage["total_tokens"] > 0:
+            self._metadata_store.record_token_usage(
+                user_id=self._user_id,
+                method=method,
+                prompt_tokens=usage["prompt_tokens"],
+                completion_tokens=usage["completion_tokens"],
+            )
+            logger.info(
+                "Token 用量已记录: method=%s, prompt=%d, completion=%d, total=%d",
+                method, usage["prompt_tokens"], usage["completion_tokens"], usage["total_tokens"],
+            )
+            self._llm_client.reset_token_counters()
+
+    def get_token_stats(self) -> dict:
+        """获取当前用户的 Token 用量统计。
+
+        Returns:
+            统计字典，见 MetadataStore.get_token_stats。
+        """
+        return self._metadata_store.get_token_stats(user_id=self._user_id)
 
     def record_feedback(
         self,

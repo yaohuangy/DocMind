@@ -111,6 +111,8 @@ class IngestResult:
         num_pages: 页数/幻灯片数/行数。
         char_count: 总字符数。
         loaded_at: 加载时间 ISO 字符串。
+        step_timings: 各步骤耗时字典。
+        total_sec: 摄入总耗时。
     """
 
     doc_id: str
@@ -121,6 +123,8 @@ class IngestResult:
     num_pages: int = 0
     char_count: int = 0
     loaded_at: str = ""
+    step_timings: dict[str, float] = field(default_factory=dict)
+    total_sec: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -132,4 +136,6 @@ class IngestResult:
             "num_pages": self.num_pages,
             "char_count": self.char_count,
             "loaded_at": self.loaded_at,
+            "step_timings": self.step_timings,
+            "total_sec": self.total_sec,
         }

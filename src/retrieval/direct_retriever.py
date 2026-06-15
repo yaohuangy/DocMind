@@ -46,7 +46,7 @@ class DirectRetriever(BaseRetriever):
         question: str,
         top_k: int = 10,
     ) -> list[SearchResult]:
-        """直接向量检索。
+        """直接向量检索（异步）。
 
         Args:
             question: 用户问题。
@@ -57,12 +57,10 @@ class DirectRetriever(BaseRetriever):
         """
         import asyncio
 
-        # 嵌入查询（在线程池中执行，不阻塞事件循环）
         query_embedding = await asyncio.to_thread(
             self._embedder.embed_query, question
         )
 
-        # 检索（带用户过滤）
         results = self._vector_store.search(
             collection_name=VectorStore.DOCUMENT_CHUNKS,
             query_embedding=query_embedding,
@@ -72,5 +70,33 @@ class DirectRetriever(BaseRetriever):
 
         logger.info(
             "直接检索完成: \"%s\" → %d 结果", question[:50], len(results)
+        )
+        return results
+
+    def _retrieve_sync(
+        self,
+        question: str,
+        top_k: int = 10,
+    ) -> list[SearchResult]:
+        """直接向量检索（纯同步，无 asyncio 开销）。
+
+        Args:
+            question: 用户问题。
+            top_k: 返回结果数。
+
+        Returns:
+            SearchResult 列表，按相似度分数降序排列。
+        """
+        query_embedding = self._embedder.embed_query(question)
+
+        results = self._vector_store.search(
+            collection_name=VectorStore.DOCUMENT_CHUNKS,
+            query_embedding=query_embedding,
+            limit=top_k,
+            where=self._where_filter,
+        )
+
+        logger.info(
+            "直接检索完成 [sync]: \"%s\" → %d 结果", question[:50], len(results)
         )
         return results

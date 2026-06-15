@@ -4,9 +4,11 @@ RAG 效果评估 + 监控页面。
 直接读写 SQLite，不依赖 engine 的 user_id 状态。
 """
 
+import os as _os
 import sqlite3
-import streamlit as st
 from pathlib import Path
+
+import streamlit as st
 
 from src.core.config import get_config
 from src.engine.session import get_engine
@@ -236,23 +238,149 @@ if by_method:
             )
 
 # ============================================================================
-# 最近反馈 —— 紧凑列表
+# 最近反馈 —— 紧凑列表（每条可单独删除）
 # ============================================================================
 
 if records:
     st.markdown("### 📜 最近反馈")
     for r in records[:10]:
+        rid = r["id"]
         icon = "👍" if r["rating"] == "useful" else "👎"
         mname = display_names.get(r.get("method", ""), r.get("method", "?"))
         ts = r["created_at"][:19] if r.get("created_at") else "?"
-        st.caption(
-            f"{icon} &nbsp;|&nbsp; **{mname}** &nbsp;|&nbsp; "
-            f"{r['question'][:80]} &nbsp;|&nbsp; "
-            f"`{r.get('latency_sec', 0):.2f}s` &nbsp;|&nbsp; "
-            f"_{ts}_"
+        lat = r.get("latency_sec", 0)
+
+        col_info, col_del = st.columns([20, 1])
+        with col_info:
+            st.caption(
+                f"{icon} &nbsp;|&nbsp; **{mname}** &nbsp;|&nbsp; "
+                f"{r['question'][:80]} &nbsp;|&nbsp; "
+                f"`{lat:.2f}s` &nbsp;|&nbsp; "
+                f"_{ts}_"
+            )
+        with col_del:
+            if st.button("🗑", key=f"del_fb_{rid}", help=f"删除此反馈 (ID={rid})"):
+                conn_del = sqlite3.connect(db_path)
+                conn_del.execute("DELETE FROM feedback WHERE id = ?", (rid,))
+                conn_del.commit()
+                conn_del.close()
+                st.rerun()
+
+    # 批量清理异常延迟记录
+    st.markdown("---")
+    with st.expander("🧹 清理异常数据"):
+        threshold = st.number_input(
+            "删除延迟 >= (秒) 的反馈记录",
+            min_value=1.0, max_value=300.0, value=5.0, step=1.0,
+            key="clean_threshold",
         )
+        if st.button("🗑 清理异常延迟记录", key="clean_slow"):
+            count = engine._metadata_store.delete_feedback_by_latency(user, threshold)
+            st.success(f"已删除 {count} 条记录（延迟 >= {threshold}s）")
+            st.rerun()
 else:
     st.info("暂无反馈数据。在问答页点赞/踩后这里会出现统计。")
+
+# ============================================================================
+# Token 成本看板
+# ============================================================================
+
+# 模型定价参考（人民币/1M tokens）
+MODEL_PRICING = {
+    "qwen3.7-max":   {"input": 2.0,  "output": 8.0},
+    "qwen3.7-plus":  {"input": 1.0,  "output": 4.0},
+    "qwen3.7-flash": {"input": 0.3,  "output": 1.2},
+    "qwen-turbo":    {"input": 0.3,  "output": 1.2},
+    "default":       {"input": 2.0,  "output": 8.0},  # 兜底
+}
+
+# 获取当前模型名（从环境变量）
+current_model = _os.getenv("LLM_MODEL", "default")
+pricing = MODEL_PRICING.get(current_model, MODEL_PRICING["default"])
+
+token_stats = engine.get_token_stats()
+
+st.markdown("---")
+st.markdown("### 💰 Token 成本分析")
+
+if token_stats["total_calls"] > 0:
+    # ---- KPI 行 ----
+    tk1, tk2, tk3, tk4 = st.columns(4)
+
+    input_cost = token_stats["total_prompt"] / 1_000_000 * pricing["input"]
+    output_cost = token_stats["total_completion"] / 1_000_000 * pricing["output"]
+    total_cost = input_cost + output_cost
+
+    with tk1:
+        st.metric("🔤 总 Token", f"{token_stats['total_tokens']:,}")
+    with tk2:
+        st.metric("📥 输入 Token", f"{token_stats['total_prompt']:,}")
+    with tk3:
+        st.metric("📤 输出 Token", f"{token_stats['total_completion']:,}")
+    with tk4:
+        st.metric("💵 预估费用", f"¥{total_cost:.4f}",
+                  help=f"模型: {current_model} | 输入 ¥{pricing['input']}/M | 输出 ¥{pricing['output']}/M")
+
+    # ---- 按方法图表 ----
+    if token_stats["by_method"]:
+        st.markdown("#### 按检索方法")
+        chart_col, table_col = st.columns([3, 2])
+
+        with chart_col:
+            # Token 用量柱状图
+            chart_tokens = {
+                display_names.get(m, m): d["total"]
+                for m, d in token_stats["by_method"].items()
+            }
+            st.caption("各方法 Token 消耗")
+            st.bar_chart(chart_tokens, horizontal=True, height=280, use_container_width=True)
+
+            # 成本柱状图
+            chart_cost = {}
+            for m, d in token_stats["by_method"].items():
+                method_cost = (d["prompt"] * pricing["input"] + d["completion"] * pricing["output"]) / 1_000_000
+                chart_cost[display_names.get(m, m)] = round(method_cost, 4)
+            st.caption("各方法预估费用 (¥)")
+            st.bar_chart(chart_cost, horizontal=True, height=280, use_container_width=True)
+
+        with table_col:
+            # 明细表
+            st.caption("方法明细")
+            for m, d in token_stats["by_method"].items():
+                mname = display_names.get(m, m)
+                mcost = (d["prompt"] * pricing["input"] + d["completion"] * pricing["output"]) / 1_000_000
+                st.markdown(
+                    f"**{mname}**  \n"
+                    f"调用 {d['calls']} 次 · {d['total']:,} token  \n"
+                    f"输入 {d['prompt']:,} / 输出 {d['completion']:,}  \n"
+                    f"约 ¥{mcost:.4f}"
+                )
+
+    # ---- 近期记录 ----
+    st.markdown("#### 📜 近期 Token 记录")
+    for r in token_stats["recent"][:10]:
+        tid = r["id"]
+        mname = display_names.get(r["method"], r["method"])
+        ts = r["created_at"][:19] if r.get("created_at") else "?"
+
+        col_tinfo, col_tdel = st.columns([20, 1])
+        with col_tinfo:
+            st.caption(
+                f"**{mname}** &nbsp;|&nbsp; "
+                f"📥 {r['prompt_tokens']:,} + 📤 {r['completion_tokens']:,} "
+                f"= {r['total_tokens']:,} token &nbsp;|&nbsp; "
+                f"_{ts}_"
+            )
+        with col_tdel:
+            if st.button("🗑", key=f"del_tk_{tid}", help=f"删除此 Token 记录 (ID={tid})"):
+                engine._metadata_store.delete_token_usage_record(tid)
+                st.rerun()
+else:
+    if token_stats["total_calls"] == 0:
+        st.info("暂无 Token 用量数据。进行一次问答后这里会出现统计。")
+    else:
+        # total_calls 为 0 时的特殊处理（仅首次加载可能）
+        st.info("暂无 Token 用量数据。")
 
 st.divider()
 st.caption("💡 每次问答后点击 👍 或 👎 即为系统提供反馈。")
