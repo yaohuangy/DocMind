@@ -63,6 +63,8 @@ class Reranker:
         """
         global _reranker_model, _model_path  # noqa: PLW0603
 
+        self._model: CrossEncoder | None = None  # type: ignore[annotation-unchecked]
+
         if model_path is None:
             model_path = _get_model_path()
 

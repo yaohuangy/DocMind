@@ -425,6 +425,10 @@ python scripts/run_evaluation.py --dataset data/evaluation/dataset_xxx.json -u <
 
 # 运行单元测试
 pytest tests/ -v
+
+# 代码检查（CI 自动执行）
+ruff check src/                     # 代码风格
+mypy src/                           # 静态类型检查
 ```
 
 > 📊 评测报告含检索指标（Recall/Precision/MRR/NDCG）、延迟分位（P50/P95）、Token 消耗统计，可选 RAGAS 生成质量评分（Faithfulness + Answer Relevancy）。详见 `eval_data.md`。
