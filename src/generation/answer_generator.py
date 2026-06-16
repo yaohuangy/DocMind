@@ -57,6 +57,7 @@ class AnswerGenerator:
         sources: list[SourceChunk],
         method: str = "mqe+hyde",
         system_prompt: str | None = None,
+        working_context: str = "",
     ) -> Generator[str, None, None]:
         """流式生成带引用的答案。
 
@@ -67,11 +68,12 @@ class AnswerGenerator:
             sources: 检索到的 SourceChunk 列表。
             method: 检索策略名称（仅用于日志）。
             system_prompt: 自定义系统提示，None 则使用默认 RAG 模板。
+            working_context: 工作记忆上下文（对话摘要 + 近期对话）。
 
         Yields:
             str: 每个增量 token。
         """
-        messages = self._build_messages(question, sources, system_prompt)
+        messages = self._build_messages(question, sources, system_prompt, working_context)
 
         logger.info(
             "开始流式生成: method=%s, sources=%d, question=%s",
@@ -95,6 +97,7 @@ class AnswerGenerator:
         sources: list[SourceChunk],
         method: str = "mqe+hyde",
         system_prompt: str | None = None,
+        working_context: str = "",
     ) -> str:
         """同步生成完整答案（非流式）。
 
@@ -103,11 +106,12 @@ class AnswerGenerator:
             sources: SourceChunk 列表。
             method: 检索策略名称。
             system_prompt: 自定义系统提示。
+            working_context: 工作记忆上下文（对话摘要 + 近期对话）。
 
         Returns:
             完整答案字符串。
         """
-        messages = self._build_messages(question, sources, system_prompt)
+        messages = self._build_messages(question, sources, system_prompt, working_context)
 
         logger.info(
             "开始同步生成: method=%s, sources=%d", method, len(sources)
@@ -129,6 +133,7 @@ class AnswerGenerator:
         question: str,
         sources: list[SourceChunk],
         system_prompt: str | None = None,
+        working_context: str = "",
     ) -> list[dict]:
         """构建 LLM 消息列表（system + user）。
 
@@ -136,17 +141,23 @@ class AnswerGenerator:
             question: 用户问题。
             sources: 源文档分块。
             system_prompt: 自定义系统提示。
+            working_context: 工作记忆上下文（对话摘要 + 近期对话）。
 
         Returns:
-            消息列表 [{"role": "system", "content": ...}, {"role": "user", "content": ...}]
+            消息列表。
         """
         if sources:
             context = self._build_context(sources)
             system = system_prompt or RAG_QA_SYSTEM
             system_content = system.format(context=context, question=question)
         else:
-            # 无检索结果时的回退 prompt
             system_content = RAG_QA_NO_CONTEXT_SYSTEM.format(question=question)
+
+        # 有工作记忆上下文时，注入到 system prompt 末尾
+        if working_context:
+            system_content += (
+                f"\n\n## 对话背景（此前与用户的交流）\n{working_context}"
+            )
 
         return [
             {"role": "system", "content": system_content},

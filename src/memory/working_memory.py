@@ -45,6 +45,7 @@ class WorkingMemory:
         self.max_entries = max_entries
         self._entries: list[WorkingMemoryEntry] = []
         self._active_concepts: list[str] = []
+        self._summary: str = ""  # 旧对话 LLM 压缩摘要
 
     # ------------------------------------------------------------------
     # 基本操作
@@ -91,33 +92,37 @@ class WorkingMemory:
         logger.info("工作记忆: +1 条目 (总计 %d/%d)", len(self._entries), self.max_entries)
 
     def get_context(self, last_n: int = 5) -> str:
-        """获取最近的对话上下文文本，供 LLM 作为附加上下文。
+        """获取对话上下文，供 LLM 作为附加上下文。
+
+        优先返回压缩摘要（历史对话） + 最近 N 轮原始对话。
 
         Args:
-            last_n: 取最近 N 轮。
+            last_n: 取最近 N 轮原始对话。
 
         Returns:
-            格式化的多轮对话文本，如::
-
-                用户: 什么是Transformer？
-                助手: Transformer是一种基于自注意力...
-                ---
-                用户: 自注意力机制如何工作？
-                助手: 自注意力通过...
-
-            若无记录则返回空字符串。
+            格式化的上下文文本。
         """
-        if not self._entries:
-            return ""
+        parts: list[str] = []
 
-        recent = self._entries[-last_n:]
-        lines: list[str] = []
+        # 压缩摘要（更早的对话）
+        if self._summary:
+            parts.append(
+                "## 历史对话摘要\n"
+                "以下是此前对话的关键信息摘要，请基于此了解用户已讨论过的内容：\n"
+                f"{self._summary}"
+            )
 
-        for entry in recent:
-            lines.append(f"用户: {entry.question}")
-            lines.append(f"助手: {entry.answer}")
+        # 最近 N 轮原始对话
+        if self._entries:
+            recent = self._entries[-last_n:]
+            lines: list[str] = []
+            for entry in recent:
+                lines.append(f"用户: {entry.question}")
+                lines.append(f"助手: {entry.answer}")
+            if lines:
+                parts.append("## 最近对话\n" + "\n---\n".join(lines))
 
-        return "\n---\n".join(lines)
+        return "\n\n".join(parts) if parts else ""
 
     def get_recent(self, n: int = 5) -> list[WorkingMemoryEntry]:
         """获取最近 N 条记录。
@@ -142,7 +147,36 @@ class WorkingMemory:
         """清空工作记忆。"""
         self._entries.clear()
         self._active_concepts.clear()
+        self._summary = ""
         logger.info("工作记忆已清空")
+
+    # ------------------------------------------------------------------
+    # 摘要
+    # ------------------------------------------------------------------
+
+    @property
+    def summary(self) -> str:
+        """当前压缩摘要。"""
+        return self._summary
+
+    def set_summary(self, text: str) -> None:
+        """设置压缩摘要（由 MemoryManager 调用）。
+
+        Args:
+            text: LLM 生成的摘要文本。
+        """
+        self._summary = text
+
+    def should_compress(self, threshold: int = 10) -> bool:
+        """是否需要压缩——条目数超过阈值。
+
+        Args:
+            threshold: 触发压缩的条目数阈值（默认 10 条）。
+
+        Returns:
+            是否需要压缩。
+        """
+        return len(self._entries) > threshold
 
     # ------------------------------------------------------------------
     # 属性

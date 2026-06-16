@@ -209,6 +209,95 @@ class MemoryManager:
         print("[MEMORY] record_interaction 完成")
 
     # ==================================================================
+    # 对话压缩
+    # ==================================================================
+
+    def compress_working_memory(self, force: bool = False) -> str | None:
+        """将工作记忆中的旧对话压缩为一段摘要。
+
+        保留最近 3 轮原始对话，更早的合并到摘要中。
+        仅当条目数超过阈值（5）或强制时执行。
+
+        Args:
+            force: 是否强制压缩（忽略阈值）。
+
+        Returns:
+            新生成的摘要文本，无需压缩时返回 None。
+        """
+        if not force and not self.working.should_compress(threshold=5):
+            return None
+
+        entries = self.working.entries
+        # 保留最近 3 轮，其余送入压缩
+        keep_count = 3
+        if len(entries) <= keep_count:
+            return None
+
+        old_entries = entries[:-keep_count]
+
+        # 构建待压缩的对话文本
+        lines: list[str] = []
+        for e in old_entries:
+            lines.append(f"问: {e.question}")
+            lines.append(f"答: {e.answer}")
+        raw_text = "\n".join(lines)
+
+        # 已有摘要则在原有摘要基础上增量更新
+        existing = self.working.summary
+        is_update = bool(existing)
+
+        try:
+            new_summary = self._generate_summary(raw_text, existing)
+        except Exception as e:
+            logger.warning("对话摘要生成失败: %s", e)
+            return None
+
+        # 清除已压缩的旧条目
+        self.working._entries = self.working._entries[-keep_count:]
+        self.working.set_summary(new_summary)
+
+        logger.info(
+            "对话压缩完成: %d 轮 → 摘要 (%d 字符), %s",
+            len(old_entries), len(new_summary),
+            "增量更新" if is_update else "首次生成",
+        )
+        return new_summary
+
+    def _generate_summary(self, new_text: str, existing_summary: str = "") -> str:
+        """用 LLM 生成/更新对话摘要。
+
+        Args:
+            new_text: 待压缩的对话文本。
+            existing_summary: 已有摘要（增量更新时传入）。
+
+        Returns:
+            摘要文本。
+        """
+        if existing_summary:
+            prompt = (
+                "你是一个对话摘要助手。请基于以下信息更新已有摘要：\n\n"
+                f"## 已有摘要\n{existing_summary}\n\n"
+                f"## 新增对话\n{new_text}\n\n"
+                "请输出更新后的摘要，保留关键信息：用户关注的话题、已确认的事实、"
+                "用户偏好、未解决的问题。用简洁的中文，不超过 500 字。"
+            )
+        else:
+            prompt = (
+                "请将以下对话压缩为一段结构化摘要：\n\n"
+                f"{new_text}\n\n"
+                "摘要应包含：用户关注的话题、已确认的关键信息、"
+                "用户的偏好或倾向、尚未解决的问题。用简洁的中文，不超过 500 字。"
+            )
+
+        return self._llm_client.chat(
+            messages=[
+                {"role": "system", "content": "你是一个专业的对话摘要助手，擅长提取关键信息并精炼表达。"},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=800,
+        )
+
+    # ==================================================================
     # 检索前：获取附加上下文
     # ==================================================================
 

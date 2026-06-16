@@ -275,6 +275,7 @@ class QAEngine:
         """流式生成带引用的答案。
 
         每次 yield 一个 token，供 ``st.write_stream()`` 逐字渲染。
+        自动注入工作记忆上下文（对话摘要 + 近期对话）。
 
         Args:
             question: 用户问题。
@@ -284,10 +285,12 @@ class QAEngine:
         Yields:
             str: 增量 token。
         """
+        working_ctx = self._get_working_context()
         yield from self._answer_generator.generate_stream(
             question=question,
             sources=sources,
             method=method,
+            working_context=working_ctx,
         )
 
     def generate(
@@ -306,10 +309,12 @@ class QAEngine:
         Returns:
             完整答案字符串。
         """
+        working_ctx = self._get_working_context()
         return self._answer_generator.generate(
             question=question,
             sources=sources,
             method=method,
+            working_context=working_ctx,
         )
 
     # ==================================================================
@@ -486,10 +491,21 @@ class QAEngine:
             return
         try:
             self.memory.record_interaction(question, answer, sources, concepts)
+            # 检查是否需要压缩工作记忆
+            self.memory.compress_working_memory()
         except Exception as e:
             logger.warning("记忆记录失败: %s", e)
             import streamlit as st
             st.warning(f"记忆记录失败: {e}")
+
+    def _get_working_context(self) -> str:
+        """获取当前工作记忆上下文（含压缩摘要）。"""
+        if self.memory is None:
+            return ""
+        try:
+            return self.memory.get_working_context(last_n=5)
+        except Exception:
+            return ""
 
     def add_note(
         self, content: str, related_concepts: list[str] | None = None
