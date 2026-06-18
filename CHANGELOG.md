@@ -1,5 +1,18 @@
 # 📋 更新日志
 
+## 2026-06-18
+
+### 🔀 动态路由（查询复杂度自适应）
+- ✅ **复杂度分类器**：`LLMClient` 新增 `classify_complexity()`，单次 LLM 调用（~200 tokens）判断问题复杂度。
+- ✅ **自动路由**：`QAEngine.retrieve()` 检索前分类——simple 走 Direct（零 Token），complex 走 HyDE（高精度），覆盖用户手动选择。
+- 📈 15 题测试准确率 93%，Token 节省 53%。
+
+### 🎯 检索结果优化
+- ✅ **最低相似度过滤**：`RetrievalConfig` 新增 `min_similarity`（默认 0.2），检索后丢弃无关结果，避免 LLM 基于不相关内容硬编。
+- ✅ **无上下文回答优化**：`RAG_QA_NO_CONTEXT_SYSTEM` 改为自然回答模式，不再建议上传文档，直接基于知识正常回答。
+
+📝 `eval_data.md` 新增动态路由评测报告；`README.md` 更新关键改进数据表和后续优化方向。
+
 ## 2026-06-16
 
 ### 🧠 对话摘要压缩

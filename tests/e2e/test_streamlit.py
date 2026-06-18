@@ -8,6 +8,7 @@ Streamlit 端到端测试（可选）。
     pytest tests/e2e/test_streamlit.py -v
 """
 
+import os
 import pytest
 
 # streamlit.testing 在 v1.30+ 可用
@@ -17,11 +18,15 @@ try:
 except ImportError:
     STREAMLIT_TESTING_AVAILABLE = False
 
-
-@pytest.mark.skipif(
-    not STREAMLIT_TESTING_AVAILABLE,
-    reason="streamlit.testing 不可用（需要 streamlit>=1.30）",
+# E2E 测试需要真实运行环境（.env 配置、ChromaDB 等）
+_RUN_E2E = os.getenv("RUN_E2E", "").lower() in ("1", "true", "yes")
+skip_e2e = pytest.mark.skipif(
+    not _RUN_E2E or not STREAMLIT_TESTING_AVAILABLE,
+    reason="E2E 测试需要 RUN_E2E=1 环境变量 + streamlit>=1.30",
 )
+
+
+@skip_e2e
 class TestAppSmoke:
     """应用冒烟测试——验证页面能否正常渲染。"""
 
@@ -51,10 +56,7 @@ class TestAppSmoke:
         assert at.chat_input is not None or True  # 验证不崩溃即可
 
 
-@pytest.mark.skipif(
-    not STREAMLIT_TESTING_AVAILABLE,
-    reason="streamlit.testing 不可用（需要 streamlit>=1.30）",
-)
+@skip_e2e
 class TestDocumentManagementPage:
     """文档管理页面测试。"""
 
@@ -71,10 +73,7 @@ class TestDocumentManagementPage:
         assert not at.exception
 
 
-@pytest.mark.skipif(
-    not STREAMLIT_TESTING_AVAILABLE,
-    reason="streamlit.testing 不可用（需要 streamlit>=1.30）",
-)
+@skip_e2e
 class TestSettingsPage:
     """设置页面测试。"""
 

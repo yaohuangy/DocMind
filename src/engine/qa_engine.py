@@ -214,6 +214,20 @@ class QAEngine:
         """
         method_key = self._normalize_method(method)
 
+        # 动态路由：简单问题→Direct，复杂问题→HyDE（覆盖用户选择）
+        if self._config.retrieval.use_dynamic_routing:
+            complexity = self._llm_client.classify_complexity(question)
+            if complexity == "complex":
+                new_method = "hyde"
+            else:
+                new_method = "direct"
+            if new_method != method_key:
+                logger.info(
+                    "动态路由: %s → %s (\"%s\")",
+                    method_key, new_method, question[:60],
+                )
+                method_key = new_method
+
         # 检查是否有文档
         stats = self._vector_store.collection_stats(VectorStore.DOCUMENT_CHUNKS)
         if stats.get("count", 0) == 0:
@@ -250,6 +264,17 @@ class QAEngine:
         # 重排序（Cross-Encoder 精排）
         if self._config.retrieval.use_reranker and len(search_results) > 1:
             search_results = self._apply_rerank(question, search_results, top_k)
+
+        # 相似度最低阈值过滤——丢弃完全不相关的结果
+        min_sim = self._config.retrieval.min_similarity
+        if min_sim > 0:
+            before = len(search_results)
+            search_results = [r for r in search_results if r.score >= min_sim]
+            if len(search_results) < before:
+                logger.info(
+                    "低分过滤: %d → %d 结果 (min_similarity=%.2f)",
+                    before, len(search_results), min_sim,
+                )
 
         # SearchResult → SourceChunk（含位置描述）
         sources = self._to_source_chunks(search_results[:top_k])

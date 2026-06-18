@@ -81,6 +81,12 @@ class RetrievalConfig:
     use_reranker: bool = False     # 启用 BAAI/bge-reranker-v2-m3 重排序
     reranker_top_k: int = 20       # 粗筛取 top-N 后再精排
 
+    # 相似度过滤
+    min_similarity: float = 0.2    # 最低相似度阈值，低于此值的检索结果丢弃
+
+    # 动态路由（查询复杂度自适应）
+    use_dynamic_routing: bool = False  # 启用后简单问题走 Direct，复杂问题走 HyDE
+
     # 去重（文本相似度去重）
     use_dedup: bool = True          # 启用检索结果语义去重
     dedup_threshold: float = 0.65   # bigram Jaccard 相似度阈值（0-1）
@@ -258,6 +264,8 @@ def load_config() -> Settings:
             rrf_k=_env_int("RRF_K", 60),
             use_reranker=_env_bool("USE_RERANKER", False),
             reranker_top_k=_env_int("RERANKER_TOP_K", 20),
+            min_similarity=_env_float("RETRIEVAL_MIN_SIMILARITY", 0.2),
+            use_dynamic_routing=_env_bool("DYNAMIC_ROUTING", False),
             use_dedup=_env_bool("RETRIEVAL_DEDUP", True),
             dedup_threshold=_env_float("RETRIEVAL_DEDUP_THRESHOLD", 0.65),
         ),

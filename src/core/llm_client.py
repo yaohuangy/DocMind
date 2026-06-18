@@ -281,6 +281,41 @@ class LLMClient:
         return concepts
 
     # ------------------------------------------------------------------
+    # 查询复杂度分类
+    # ------------------------------------------------------------------
+
+    def classify_complexity(self, question: str) -> str:
+        """快速判断问题复杂度（simple / complex）。
+
+        用最小 token 开销做一次 LLM 调用，供动态路由使用。
+
+        Args:
+            question: 用户问题。
+
+        Returns:
+            "simple" 或 "complex"（解析失败默认返回 "simple"）。
+        """
+        from src.generation.prompt_templates import QUERY_CLASSIFY_SYSTEM
+
+        try:
+            result = self.chat(
+                messages=[
+                    {"role": "system", "content": QUERY_CLASSIFY_SYSTEM},
+                    {"role": "user", "content": question},
+                ],
+                max_tokens=10,
+                temperature=0.0,
+            )
+            result = result.strip().lower()
+            if "simple" in result:
+                return "simple"
+            if "complex" in result:
+                return "complex"
+            return "simple"
+        except Exception:
+            return "simple"
+
+    # ------------------------------------------------------------------
     # Token 累加器
     # ------------------------------------------------------------------
 

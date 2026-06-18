@@ -48,7 +48,7 @@ class TestRagQaNoContextSystem:
     def test_format_with_question(self):
         result = RAG_QA_NO_CONTEXT_SYSTEM.format(question="什么是 AI？")
         assert "什么是 AI？" in result
-        assert "没有可用的参考文档" in result
+        assert "没有从知识库中检索到相关文档" in result
 
     def test_missing_question_raises_keyerror(self):
         with pytest.raises(KeyError):
