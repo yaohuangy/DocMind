@@ -59,6 +59,7 @@ $RECYCLE.BIN/
 # Runtime data
 # ============================================================================
 data/chroma/
+data/test_chroma/
 data/uploads/
 data/*.db
 data/*.db-shm
