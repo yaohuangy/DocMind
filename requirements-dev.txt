@@ -17,5 +17,8 @@ mypy>=1.10
 # 生成阶段评测（可选）
 ragas>=0.2.0
 
+# MCP Server（MCP 协议集成）
+mcp>=1.0.0
+
 # 类型存根（mypy 需要）
 types-requests>=2.31

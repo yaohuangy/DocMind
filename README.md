@@ -369,6 +369,8 @@ DocMind/
 │   │   ├── session.py               # Streamlit 引擎单例工厂
 │   │   └── models.py                # DTO 定义
 │   │
+│   ├── mcp_server.py                 # MCP Server（stdio 模式，3 个工具）
+│   │
 │   └── evaluation/                  # 离线评测框架（5 文件）
 │       ├── ground_truth_generator.py # LLM 自动生成评测集
 │       ├── evaluation_runner.py      # 4 方法 Benchmark
@@ -378,7 +380,8 @@ DocMind/
 │
 ├── scripts/                         # CLI 工具
 │   ├── generate_eval_dataset.py     # 生成 Ground Truth
-│   └── run_evaluation.py            # 跑 Benchmark
+│   ├── run_evaluation.py            # 跑 Benchmark
+│   └── test_mcp.py                  # MCP Server 本地验证脚本
 │
 ├── tests/                           # 测试（含 e2e）
 ├── data/                            # 运行时数据（gitignore）
@@ -393,6 +396,8 @@ DocMind/
 ├── requirements.txt                 # 运行时依赖
 ├── requirements-dev.txt             # 开发与 CI 依赖
 ├── .env.example
+├── .mcp.json                        # Claude Code MCP 配置
+├── mcp_server.py                     # MCP Server 入口（备用）
 ├── CHANGELOG.md
 └── README.md
 ```
@@ -535,3 +540,11 @@ mypy src/                           # 静态类型检查
 - ✅ **对话摘要压缩**：工作记忆超过 10 条时自动触发 LLM 压缩——旧对话压缩为结构化摘要（关键问题、已确认事实、用户偏好），保留最近 3 轮原话。20 轮测试 token 从 1992 降至 497（-75%），长会话上下文不再线性增长。
 - 🚧 **独立记忆 Agent**：将记忆的存储/检索/压缩逻辑从 QAEngine 中解耦为独立 MemoryAgent。它拥有自己的 tool set（写入情景记忆、查询语义记忆、生成摘要、提取概念），通过 function calling 自主决定何时记什么、何时压缩、何时检索回忆。主 Agent 只需调用 MemoryAgent 接口，不再关心记忆内部实现。
 - 💡 *叙事：记忆不再是简单的日志，而是一个会「主动整理笔记」的独立 Agent。旧对话自动压缩，关键信息自动归档，长期使用越用越聪明。*
+
+### ✅ MCP 协议集成
+- ✅ **DocMind MCP Server**：将 DocMind 的 RAG 能力封装为 MCP Server（标准 AI 工具协议），提供 `search_documents`（语义检索）、`ask_knowledge_base`（检索+生成）、`list_knowledge_base`（文档清单）三个工具。已在 **Claude Code** 和 **VS Code Copilot** 验证通过。配置方式：
+  - **Claude Code**：项目根目录 `.mcp.json`（自动识别）
+  - **VS Code Copilot**：`.vscode/mcp.json`，Reload Window 后即可调用
+  - **Claude Desktop / Cursor**：参考 `src/mcp_server.py` 头注释中的配置示例
+- 🚧 **MCP 外部工具接入**：DocMind 作为 MCP Client 接入联网搜索、天气查询、文件系统等外部 MCP Server，扩展 Agent 能力边界——不再局限于已上传文档，可实时获取最新信息。
+- 💡 *叙事：从封闭的问答网页升级为开放的知识基础设施。DocMind 既能作为 MCP Server 被任何 AI 调用，也能作为 MCP Client 调用外部工具，成为本地知识中枢。*

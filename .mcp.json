@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "docmind": {
+      "type": "stdio",
+      "command": "venv/Scripts/python",
+      "args": [
+        "mcp_server.py"
+      ],
+      "env": {
+        "DOCMIND_USER_ID": "Yao"
+      }
+    }
+  }
+}

@@ -1,5 +1,28 @@
 # 📋 更新日志
 
+## 2026-06-22
+
+### 🔌 MCP 协议集成
+
+- ✅ **DocMind MCP Server**：新增 `src/mcp_server.py`（主入口）和 `mcp_server.py`（备用入口），基于 `FastMCP` 将 DocMind RAG 能力以 MCP 协议暴露。
+- ✅ **三个标准工具**：
+  - `search_documents(query, top_k)` — 语义检索文档分块，返回来源引用
+  - `ask_knowledge_base(question)` — 检索 + LLM 生成带引用答案
+  - `list_knowledge_base()` — 列出知识库所有文档
+- ✅ **多客户端支持**：
+  - **Claude Code**：`.mcp.json` 配置，即插即用，已通过本会话验证
+  - **VS Code Copilot**：`.vscode/mcp.json` 配置，Reload Window 后生效，已验证通过
+  - **Claude Desktop / Cursor**：配置示例写在 `src/mcp_server.py` 头注释中
+- ✅ **用户隔离**：通过 `DOCMIND_USER_ID` 环境变量指定用户，与 Streamlit 共享同一套向量库和记忆。
+- 🔧 **VS Code 踩坑**：`.vscode/mcp.json` 不会被工作区设置覆盖，正常编写 JSON 即可。
+
+### 📝 文档更新
+
+- 📝 `README.md` 更新 MCP 协议集成段落（`🚧` → `✅`）、项目结构新增 MCP 文件。
+- 📝 `scripts/test_mcp.py` MCP Server 本地验证脚本（无需启动 MCP，直接测 QAEngine）。
+
+---
+
 ## 2026-06-18
 
 ### 🔀 动态路由（查询复杂度自适应）
