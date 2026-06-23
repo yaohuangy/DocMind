@@ -15,6 +15,7 @@ Usage::
 
 import logging
 from collections.abc import Generator
+from typing import Any
 
 from src.core.config import Settings, get_config
 from src.core.embedder import create_embedder
@@ -99,6 +100,11 @@ class QAEngine:
 
         # ---- 检索器（延迟实例化） ----
         self._retrievers: dict = {}
+
+        # ---- MCP Client（延迟实例化） ----
+        self._mcp_client: Any = None
+        self._external_router: Any = None
+        self._mcp_client_available: bool | None = None  # None=未检测
 
         # ---- 用户 ----
         self._user_id: str = "default"
@@ -342,6 +348,110 @@ class QAEngine:
             working_context=working_ctx,
         )
 
+    def generate_with_external(
+        self,
+        question: str,
+        method: str = "auto",
+        top_k: int = 5,
+    ) -> dict:
+        """本地+外部融合问答（Phase 3 入口）。
+
+        内部调用 retrieve_with_external() + merge_results() +
+        generate()，返回带区分引用的答案。
+
+        Args:
+            question: 用户问题。
+            method: 检索策略。
+            top_k: 本地检索返回数。
+
+        Returns:
+            {
+                "answer": str,                    # 生成答案（含引用标记）
+                "local_sources": [SourceChunk],   # 本地来源
+                "external_sources": [dict],       # 外部来源 {"title","url","snippet"}
+                "merged": [MergedResult],         # 融合结果（调试用）
+                "route_decision": RouteDecision,  # 路由决策
+            }
+        """
+        from src.generation.prompt_templates import RAG_QA_WITH_EXTERNAL_SYSTEM
+        from src.mcp_client.fusion import MergedResult, build_context, merge_results
+
+        # 1. 检索本地 + 可选外部
+        retrieved = self.retrieve_with_external(
+            question, method=method, top_k=top_k
+        )
+        local = retrieved["local"]
+        external = retrieved["external"]
+        decision = retrieved["route_decision"]
+
+        # 2. 融合
+        if external:
+            merged = merge_results(local, external, max_total=8)
+        else:
+            # 纯本地
+            merged = [
+                MergedResult(
+                    source_type="local",
+                    citation=f"[{i}]",
+                    title=s.doc_name,
+                    text=s.text[:600],
+                    score=s.score,
+                    chunk=s,
+                )
+                for i, s in enumerate(local[:5], 1)
+            ]
+
+        # 3. 构建 context
+        context = build_context(merged)
+
+        # 4. 选择 prompt 模板
+        if external:
+            system_prompt = RAG_QA_WITH_EXTERNAL_SYSTEM.format(
+                context=context, question=question
+            )
+        else:
+            from src.generation.prompt_templates import RAG_QA_SYSTEM
+            local_context = context  # build_context 已有本地部分
+            system_prompt = RAG_QA_SYSTEM.format(
+                context=local_context, question=question
+            )
+
+        # 5. 生成答案（不走流式，直接调 LLM）
+        raw_answer = self._llm_client.chat([
+            {"role": "system", "content": system_prompt},
+        ])
+
+        # 6. 引用格式化
+        from src.core.vector_store import SearchResult
+        search_results = []
+        for m in merged:
+            if m.source_type == "local" and m.chunk:
+                search_results.append(SearchResult(
+                    chunk_id=m.chunk.chunk_id,
+                    text=m.chunk.text,
+                    score=m.chunk.score,
+                    metadata=m.chunk.metadata,
+                ))
+
+        external_dicts = [
+            {"title": m.title, "url": m.url, "snippet": m.text}
+            for m in merged if m.source_type == "external"
+        ]
+
+        formatted = self._citation_formatter.format_with_external(
+            raw_answer=raw_answer,
+            search_results=search_results,
+            external_results=external_dicts if external_dicts else None,
+        )
+
+        return {
+            "answer": formatted["formatted_answer"],
+            "local_sources": formatted["local_sources"],
+            "external_sources": formatted["external_sources"],
+            "merged": merged,
+            "route_decision": decision,
+        }
+
     # ==================================================================
     # 引用格式化
     # ==================================================================
@@ -499,6 +609,98 @@ class QAEngine:
         if self.memory is not None:
             self.memory.session_id = session_id
             self.memory.working.session_id = session_id
+
+    def set_dynamic_routing(self, enabled: bool) -> None:
+        """启用/禁用动态路由（简单问题→Direct，复杂问题→HyDE）。
+
+        MCP Server 在 method="auto" 时启用，显式指定方法时禁用。
+
+        Args:
+            enabled: True 启用动态路由。
+        """
+        self._config.retrieval.use_dynamic_routing = enabled
+
+    # ==================================================================
+    # MCP Client —— 外部工具搜索
+    # ==================================================================
+
+    def has_external_search(self) -> bool:
+        """检查是否有可用的外部搜索工具（Tavily 等）。"""
+        if self._mcp_client_available is None:
+            try:
+                from src.mcp_client import MCPClientManager
+                manager = MCPClientManager()
+                self._mcp_client_available = len(manager._configs) > 0
+            except Exception:
+                self._mcp_client_available = False
+        return self._mcp_client_available
+
+    def retrieve_with_external(
+        self,
+        question: str,
+        method: str = "auto",
+        top_k: int = 5,
+    ) -> dict:
+        """检索本地文档 + 可选外部搜索，返回融合结果。
+
+        内部自动判断是否需要外部搜索（路由），无需外部时等同于 retrieve()。
+
+        Args:
+            question: 用户问题。
+            method: 检索策略（同 retrieve()）。
+            top_k: 本地检索返回数。
+
+        Returns:
+            {
+                "local": [SourceChunk, ...],      # 本地检索结果
+                "external": [ExternalResult, ...],  # 外部搜索结果
+                "route_decision": RouteDecision,    # 路由决策
+            }
+        """
+        import asyncio
+
+        # 1. 本地检索（同步）
+        resolved = self._normalize_method(method)
+        if method == "auto":
+            self.set_dynamic_routing(True)
+            resolved = "direct"
+        else:
+            self.set_dynamic_routing(False)
+
+        local = self.retrieve(question, method=resolved, top_k=top_k)
+
+        # 2. 路由决策
+        try:
+            from src.mcp_client.router import ExternalRouter
+            if self._external_router is None:
+                self._external_router = ExternalRouter(use_llm_fallback=False)
+            decision = self._external_router.decide(question)
+        except Exception:
+            decision = None
+
+        # 3. 外部搜索（如果需要且有可用工具）
+        external = []
+        if decision and decision.need_external and self.has_external_search():
+            try:
+                from src.mcp_client import MCPClientManager
+                if self._mcp_client is None:
+                    self._mcp_client = MCPClientManager()
+
+                async def _search():
+                    await self._mcp_client.connect_all()
+                    results = await self._mcp_client.search_external(question)
+                    await self._mcp_client.close_all()
+                    return results
+
+                external = asyncio.run(_search())
+            except Exception as exc:
+                logger.warning("外部搜索失败，回退纯本地: %s", exc)
+
+        return {
+            "local": local,
+            "external": external,
+            "route_decision": decision,
+        }
 
     # ==================================================================
     # 记忆系统便捷方法（委托给 MemoryManager，None-safe）

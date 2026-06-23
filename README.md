@@ -1,8 +1,12 @@
-# 📚 DocMind — 智能文档问答助手
+# 📚 DocMind — MCP 原生知识中枢
 
-Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。用户上传 PDF、Word、网页等文档后，可以用自然语言提问，系统会自动检索相关片段并生成带内联引用的流式回答，同时将问答记录写入认知记忆模型，逐步构建个人知识图谱。
+> **DocMind = MCP Server（对外提供知识库） + MCP Client（对内调用外部工具）** — 一个完整的 MCP 原生智能体。\n> 既是 RAG 文档问答系统，也是 AI 可调用的知识基础设施。Claude Code、VS Code Copilot、Cursor 等任何支持 MCP 的客户端都能直接使用。
 
-相比只输出一段文本的 LLM Demo，这个项目更强调完整链路落地：从**多格式文档解析、多维检索策略、答案生成与引用定位，到三记忆学习系统、在线反馈监控与多用户数据隔离**，尽量把 RAG 能力组织成一个可交互、可持久化、可评估的产品原型。
+Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统，同时实现了 **MCP Server + MCP Client 双角色架构**。用户上传 PDF、Word、网页等文档后，可以用自然语言提问，系统会自动检索相关片段并生成带内联引用的流式回答，同时将问答记录写入认知记忆模型（工作记忆+情景记忆+语义记忆），逐步构建个人知识图谱。
+
+**作为 MCP 原生智能体**，DocMind 既能被 Claude Code、VS Code Copilot 等 AI 客户端通过 MCP 协议直接调用（5 个工具），也能作为 MCP Client 连接外部服务（已接入 Tavily 联网搜索）——当本地文档无法覆盖时效性问题时，自动触发联网搜索并融合结果，答案中清晰区分本地来源 `[N]` 和网络来源 `[E]`。
+
+相比只输出一段文本的 LLM Demo，这个项目更强调完整链路落地：从**多格式文档解析、多维检索策略、答案生成与引用定位，到三记忆学习系统、MCP 双角色架构、在线反馈监控与多用户数据隔离**，尽量把 RAG 能力组织成一个可交互、可持久化、可评估的产品原型。
 
 🌐 **在线体验**：https://docmind-production-ed1a.up.railway.app
 
@@ -75,6 +79,17 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 | 📎 内联引用 | `[1][2]` 标记 + 可展开源片段（适配 8 种格式的位置描述） |
 | 👍 用户反馈 | 每条回答下 👍/👎 按钮，后台线程记录记忆不阻塞页面 |
 
+### MCP 原生智能体 🆕
+| 功能 | 说明 |
+|------|------|
+| 🔌 MCP Server | 5 个标准工具：`search_documents` / `ask_knowledge_base` / `search_with_web` / `list_knowledge_base` / `get_available_tools` |
+| 🌐 联网搜索 | 集成 Tavily Search API（免费 1000 次/月），自动判断时效性问题并触发联网搜索 |
+| 🧠 智能路由 | 规则匹配（零 Token）+ LLM 判断兜底，准确率 100%（9/9 测试集）。自动识别时效性/趋势/新闻类问题 |
+| 🔗 结果融合 | 本地文档 + 网络结果交错排列，bigram Jaccard 去重，`[N]` 本地引用 + `[E]` 外部引用清晰区分 |
+| 🤖 多客户端支持 | Claude Code（`.mcp.json`）/ VS Code Copilot（`.vscode/mcp.json`）/ Claude Desktop / Cursor |
+| 💬 流式回答 | MCP 协议 async generator 逐 token 输出，体验对齐 Streamlit 页面 |
+| 📋 能力自描述 | `get_available_tools` 让 AI 客户端自动发现 DocMind 能做什么，无需人工告知 |
+
 ### 三记忆学习系统
 | 记忆 | 存储 | 说明 |
 |------|------|------|
@@ -144,6 +159,7 @@ Docmind 是一个基于检索增强生成（RAG）的智能文档问答系统。
 | 🆓 免费模型 | 默认阿里 DashScope（qwen-turbo），支持本地 Embedding 模型 |
 | 🎛️ 灵活配置 | 可视化设置页——LLM/Embedding/检索参数，改完即时生效 |
 | 🛡️ 优雅降级 | Neo4j 不可用 → 语义记忆自动禁用，问答笔记不影响 |
+| 🔌 MCP 原生 | Server + Client 双角色，5 个标准工具 + Tavily 联网搜索 |
 | 🐍 纯 Python | 0 行 HTML/CSS/JS，Streamlit 原生组件 |
 
 ---
@@ -417,6 +433,7 @@ DocMind/
 | **配置单例** | `load_config()` + `st.cache_resource`，全应用配置一致 |
 | **6 层用户隔离** | ChromaDB / SQLite / Neo4j / 情景记忆 / 分块 / 摄入，全链路 user_id 过滤 |
 | **query_params 持久化** | 刷新/切换页面保持登录，退出即清除 |
+| **MCP 双角色** | Server（5 工具对外暴露知识库）+ Client（Tavily 联网搜索），一次编写、多客户端复用 |
 | **反馈闭环** | 用户 👍/👎 存入 SQLite `feedback` 表，监控页按方法统计满意率和延迟，形成持续优化回路 |
 
 ## 📊 评测
@@ -481,6 +498,11 @@ mypy src/                           # 静态类型检查
 - ✅ **4 种检索策略**：Direct / MQE（RRF k=60）/ HyDE / MQE+HyDE（asyncio.gather 并行），支持流式输出与内联引用。
 - ✅ **三记忆学习系统**：工作记忆（会话上下文）+ 情景记忆（ChromaDB 持久化）+ 语义记忆（Neo4j 知识图谱），每次问答自动提取概念并建图。
 
+### MCP 原生智能体
+- ✅ **MCP Server**：5 个标准工具（search_documents / ask_knowledge_base / search_with_web / list_knowledge_base / get_available_tools），Claude Code + VS Code Copilot 验证通过。
+- ✅ **MCP Client**：接入 Tavily 联网搜索 API（5 个工具：search/extract/crawl/map/research），智能路由自动触发。
+- ✅ **结果融合**：本地文档 + 网络结果交错排列，`[N]` 本地引用 + `[E]` 外部引用清晰区分，bigram Jaccard 去重。
+
 ### 数据与用户管理
 - ✅ **多用户数据隔离**：6 层隔离（ChromaDB where / SQLite user_id / Neo4j user_id / 情景记忆过滤 / 分块标签 / 摄入标签）。
 - ✅ **聊天持久化**：SQLite 存储对话记录，刷新/切换页面消息不丢失，`st.query_params` 保持登录态。
@@ -542,9 +564,16 @@ mypy src/                           # 静态类型检查
 - 💡 *叙事：记忆不再是简单的日志，而是一个会「主动整理笔记」的独立 Agent。旧对话自动压缩，关键信息自动归档，长期使用越用越聪明。*
 
 ### ✅ MCP 协议集成
-- ✅ **DocMind MCP Server**：将 DocMind 的 RAG 能力封装为 MCP Server（标准 AI 工具协议），提供 `search_documents`（语义检索）、`ask_knowledge_base`（检索+生成）、`list_knowledge_base`（文档清单）三个工具。已在 **Claude Code** 和 **VS Code Copilot** 验证通过。配置方式：
-  - **Claude Code**：项目根目录 `.mcp.json`（自动识别）
-  - **VS Code Copilot**：`.vscode/mcp.json`，Reload Window 后即可调用
-  - **Claude Desktop / Cursor**：参考 `src/mcp_server.py` 头注释中的配置示例
-- 🚧 **MCP 外部工具接入**：DocMind 作为 MCP Client 接入联网搜索、天气查询、文件系统等外部 MCP Server，扩展 Agent 能力边界——不再局限于已上传文档，可实时获取最新信息。
-- 💡 *叙事：从封闭的问答网页升级为开放的知识基础设施。DocMind 既能作为 MCP Server 被任何 AI 调用，也能作为 MCP Client 调用外部工具，成为本地知识中枢。*
+- ✅ **DocMind MCP Server**：将 DocMind 的 RAG 能力封装为 MCP Server，提供 5 个标准工具：
+  - `search_documents` — 语义检索（结构化 JSON 含分数+来源页）
+  - `ask_knowledge_base` — 流式问答（支持 `include_external=True` 开启联网）
+  - `search_with_web` — 本地+联网融合搜索（`[N]` 本地 + `[E]` 外部引用）
+  - `list_knowledge_base` — 文档清单
+  - `get_available_tools` — 能力自描述（AI 客户端自动发现）
+- ✅ **MCP Client — 联网搜索**：DocMind 作为 MCP Client 接入 **Tavily Search API**（免费 1000 次/月），5 个工具（search/extract/crawl/map/research）。智能路由自动判断时效性问题并触发联网搜索，本地+外部结果融合后生成区分引用的答案。
+- ✅ **多客户端验证**：已在 **Claude Code** 和 **VS Code Copilot** 验证通过。
+  - **Claude Code**：`.mcp.json` 即插即用
+  - **VS Code Copilot**：`.vscode/mcp.json`，Reload Window 后可用
+  - **Claude Desktop / Cursor**：配置示例见 `src/mcp_server.py` 头注释
+- 🚧 **MCP 外部工具扩展**：后续可接入 Filesystem、SQLite、GitHub 等更多外部 MCP Server。
+- 💡 *叙事：DocMind 不只是文档问答工具，而是一个 MCP 原生智能体——既能作为 Server 被任何 AI 调用，也能作为 Client 调用外部工具。从封闭网页升级为开放的知识基础设施。*

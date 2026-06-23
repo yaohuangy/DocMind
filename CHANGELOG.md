@@ -1,5 +1,80 @@
 # 📋 更新日志
 
+## 2026-06-23
+
+### 🧠 MCP 原生智能体 Phase 0-4 完整交付
+
+> **DocMind = MCP Server（对外提供知识库） + MCP Client（对内调用外部工具）**\n> 今日完成 5 个 Phase，将 DocMind 从一个简单的 MCP Server 升级为完整的 MCP 原生智能体。
+
+---
+
+### Phase 0：MCP Server 工具打磨
+
+- ✅ **结构化输出**：`search_documents` / `list_knowledge_base` 返回结构化 JSON 替代纯文本 Markdown，AI 客户端无需自行解析。
+- ✅ **流式回答**：`ask_knowledge_base` 改为 async generator，逐 token 流式输出，体验对齐 Streamlit。
+- ✅ **自动路由**：所有工具新增 `method` 参数，默认 `"auto"` 模式利用已有动态路由（93% 准确率），AI 客户端也可显式指定。
+- ✅ **工具描述重写**：3 个工具的 description 改为面向 AI 的 API 文档风格，含使用场景建议和参数示例。
+
+### Phase 1：MCP Client 基础设施
+
+- ✅ **`src/mcp_client/` 包**：新建 4 个模块（config / models / client_manager / router）+ `__init__.py`。
+- ✅ **`MCPClientManager`**：管理外部 MCP Server 的 stdio 连接，支持 `connect_all()` → `list_tools()` → `call_tool()` → `close_all()` 全生命周期。
+- ✅ **Tavily 联网搜索**：接入 `tavily-mcp` 官方 MCP Server，5 个工具（search / extract / crawl / map / research），免费 1000 次/月。
+- ✅ **自动配置**：从 `.env` 读取 `TAVILY_API_KEY` 自动加载 Tavily，无需手动配置。
+- ✅ **测试**：`scripts/test_tavily_search.py` 验证全链路，5 条搜索结果完美解析。
+
+### Phase 2：智能路由决策
+
+- ✅ **`ExternalRouter`**：双模式路由（规则匹配 + LLM 回退），规则模式零 Token 消耗。
+- ✅ **路由准确率 100%**（9/9 测试集）：时效性关键词（最新/2026/今天）→ 联网搜索；文档内问题（第X章/根据文档）→ 纯本地；趋势/对比/新闻类 → 联网搜索。
+- ✅ **`QAEngine.retrieve_with_external()`**：本地检索 + 可选外部搜索，自动路由判断。内部桥接异步 MCP Client 到同步 QAEngine。
+
+### Phase 3：结果融合与引用
+
+- ✅ **`merge_results()`**：本地文档 + 外部搜索结果融合，bigram Jaccard 去重，交错排列（L1→E1→L2→E2）。
+- ✅ **区分引用**：本地来源 `[N]` + 外部来源 `[E1][E2]`，答案中一眼分辨信息来源。
+- ✅ **Prompt 扩展**：新增 `RAG_QA_WITH_EXTERNAL_SYSTEM` 模板，引导 LLM 综合本地和网络信息。
+- ✅ **`CitationFormatter.format_with_external()`**：解析 `[N]` 和 `[EN]` 双重引用标记。
+- ✅ **`QAEngine.generate_with_external()`**：融合问答一站式入口——路由→检索→融合→生成→引用格式化。
+
+### Phase 4：MCP Server 工具升级
+
+- ✅ **新增 `search_with_web` 工具**：同时搜索本地知识库和互联网，返回融合答案（含 `[N]`/`[E]` 引用 + 外部链接）。
+- ✅ **新增 `get_available_tools` 工具**：AI 客户端自动发现 DocMind 能力清单（本地检索 / 联网搜索 / 文档管理 / 知识图谱）。
+- ✅ **`ask_knowledge_base` 升级**：新增 `include_external=True` 参数，AI 可自行选择是否开启联网搜索。
+- ✅ **MCP 工具总数**：3 → 5。全部在 **Claude Code** 和 **VS Code Copilot** 验证通过。
+
+---
+
+### 📊 新增代码统计
+
+| 类别 | 文件数 | 行数 |
+|------|:-----:|:----:|
+| `src/mcp_client/`（新建包） | 6 | ~750 |
+| `src/mcp_server.py`（重写） | 1 | ~350 |
+| `mcp_server.py`（同步） | 1 | ~150 |
+| `src/engine/qa_engine.py`（新增方法） | 1 | +180 |
+| `src/generation/`（prompt + citation） | 2 | +105 |
+| `scripts/`（测试脚本） | 4 | ~220 |
+| `docs/mcp-agent-plan.md`（方案文档） | 1 | ~500 |
+| **合计** | **16** | **~2,255** |
+
+### 📝 文档更新
+
+- 📝 `README.md`：项目定位升级为「MCP 原生知识中枢」；新增 MCP 原生智能体功能区块（7 项）；MCP 协议集成段落全标记为 ✅。
+- 📝 `CHANGELOG.md`：本文档。
+- 📝 `docs/mcp-agent-plan.md`：完整技术方案（Phase 0-5 + 架构图 + 配置指南）。
+- 📝 `.env.example`：新增 MCP Client 配置注释。
+
+### 🔧 配置与依赖
+
+- 🔧 `requirements.txt` / `requirements-dev.txt`：新增 `mcp>=1.0.0`。
+- 🔧 `.env`：新增 `TAVILY_API_KEY` + `MCP_CLIENT_ENABLED`。
+- 🔧 `pyproject.toml`：mypy `python_version` 3.10 → 3.12（修复 CI numpy 类型存根兼容）。
+- 🔧 `.gitignore`：新增 `data/test_chroma/`。
+
+---
+
 ## 2026-06-22
 
 ### 🔌 MCP 协议集成

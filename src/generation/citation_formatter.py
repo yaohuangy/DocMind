@@ -17,6 +17,8 @@
 - CSV/Excel: "第10行"
 """
 
+from __future__ import annotations
+
 import logging
 import re
 
@@ -27,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 # 匹配引用标记：[1], [2], [3] 等
 _CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+# 匹配外部引用标记：[E1], [E2] 等
+_EXTERNAL_CITATION_PATTERN = re.compile(r"\[E(\d+)\]")
 
 
 class CitationFormatter:
@@ -140,13 +144,75 @@ class CitationFormatter:
 
         return remapped_answer, new_sources
 
+    def format_with_external(
+        self,
+        raw_answer: str,
+        search_results: list[SearchResult],
+        external_results: list[dict] | None = None,
+    ) -> dict:
+        """格式化包含本地和外部来源的答案。
+
+        解析 [N]（本地）和 [EN]（外部）引用标记。
+
+        Args:
+            raw_answer: LLM 生成的答案。
+            search_results: 本地检索结果。
+            external_results: 外部搜索结果列表，每项为
+                {"title": str, "url": str, "snippet": str}。
+
+        Returns:
+            {
+                "formatted_answer": str,
+                "local_sources": [SourceChunk, ...],
+                "external_sources": [dict, ...],
+            }
+        """
+        if not raw_answer:
+            return {
+                "formatted_answer": "",
+                "local_sources": [],
+                "external_sources": [],
+            }
+
+        # 解析本地引用
+        cited_indices = self._extract_cited_indices(raw_answer)
+        local_sources: list[SourceChunk] = []
+        for idx in cited_indices:
+            result_idx = idx - 1
+            if 0 <= result_idx < len(search_results):
+                local_sources.append(
+                    self._build_source_chunk(search_results[result_idx], idx)
+                )
+
+        # 解析外部引用
+        external_sources: list[dict] = []
+        if external_results:
+            ext_indices = self._extract_external_indices(raw_answer)
+            for ext_idx in ext_indices:
+                result_idx = ext_idx - 1
+                if 0 <= result_idx < len(external_results):
+                    ext = external_results[result_idx]
+                    external_sources.append({
+                        "index": ext_idx,
+                        "citation": f"[E{ext_idx}]",
+                        "title": ext.get("title", ""),
+                        "url": ext.get("url", ""),
+                        "snippet": ext.get("snippet", "")[:300],
+                    })
+
+        return {
+            "formatted_answer": raw_answer,
+            "local_sources": local_sources,
+            "external_sources": external_sources,
+        }
+
     # ------------------------------------------------------------------
     # 内部方法
     # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_cited_indices(text: str) -> list[int]:
-        """从答案中提取所有被引用的编号。
+        """从答案中提取 [N] 引用编号（排除 [EN] 类外部引用）。
 
         Args:
             text: 含 [N] 标记的答案文本。
@@ -154,7 +220,23 @@ class CitationFormatter:
         Returns:
             去重后的编号列表，按升序排列。
         """
-        matches = _CITATION_PATTERN.findall(text)
+        # 先剔除所有 [E\d+] 标记，避免误匹配
+        cleaned = _EXTERNAL_CITATION_PATTERN.sub("", text)
+        matches = _CITATION_PATTERN.findall(cleaned)
+        indices = sorted(set(int(m) for m in matches))
+        return indices
+
+    @staticmethod
+    def _extract_external_indices(text: str) -> list[int]:
+        """从答案中提取 [EN] 外部引用编号。
+
+        Args:
+            text: 含 [E1][E2] 标记的答案文本。
+
+        Returns:
+            去重后的编号列表，按升序排列。
+        """
+        matches = _EXTERNAL_CITATION_PATTERN.findall(text)
         indices = sorted(set(int(m) for m in matches))
         return indices
 
